@@ -1,0 +1,11 @@
+grupo,distribucion_seleccionada,parametros,estadistico_KS,p_value_final,conclusion,criterio
+biceps_curl,weibull_min,"(np.float64(1.8091151173314375), np.float64(2.472538733852419), np.float64(4.386211876876824))",0.017170304758374,0.002,se rechaza H0,Todas rechazadas; menor KS relativo
+cable,weibull_min,"(np.float64(2.0844496115455406), np.float64(2.7352146158078465), np.float64(6.8923317717187995))",0.023681303815137833,0.03436257260532616,se rechaza H0,Todas rechazadas; menor KS relativo
+chest_fly,gamma,"(np.float64(4.195799549046656), np.float64(1.9163730275391708), np.float64(1.1309633077660952))",0.01723202494130148,0.21845070423037816,no se rechaza H0,No rechazo H0; menor KS entre las candidatas
+chest_press,lognorm,"(np.float64(0.3099245778290903), -0.9587485208220521, np.float64(9.221681076789203))",0.02131612933420801,0.010757099796076983,se rechaza H0,Todas rechazadas; menor KS relativo
+lat_pulldown,weibull_min,"(np.float64(1.878231148380447), np.float64(3.0984127880385763), np.float64(6.237831864329951))",0.017316424258452257,0.0,se rechaza H0,Todas rechazadas; menor KS relativo
+leg_curl,weibull_min,"(np.float64(1.720482352456599), np.float64(2.9892059718068094), np.float64(5.235646392553657))",0.02646294055236781,0.015590037418457376,se rechaza H0,Todas rechazadas; menor KS relativo
+leg_extension,weibull_min,"(np.float64(1.6947580868119825), np.float64(3.061454453495663), np.float64(5.0158663136214745))",0.017797473576407097,0.20093184138428233,no se rechaza H0,No rechazo H0; menor KS entre las candidatas
+leg_press,weibull_min,"(np.float64(1.8405164903423494), np.float64(4.033245196740897), np.float64(7.817619809532321))",0.02387350893500967,0.017045037758440792,se rechaza H0,Todas rechazadas; menor KS relativo
+seated_row,weibull_min,"(np.float64(2.0335368550959267), np.float64(2.7251725345339977), np.float64(6.653087145935917))",0.017829085693656932,0.0420190035515321,se rechaza H0,Todas rechazadas; menor KS relativo
+shoulder_press,weibull_min,"(np.float64(1.9018024481909563), np.float64(3.1356367535364598), np.float64(6.2961475232505535))",0.019317264715299765,0.0210100782944119,se rechaza H0,Todas rechazadas; menor KS relativo
