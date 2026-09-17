@@ -10,9 +10,9 @@
 
 ## 1. Objetivo y alcance
 
-Este documento describe el proceso de limpieza aplicado a `log_operacional_historico.csv`, correspondiente a la etapa compartida de preparación de datos que utilizan las cuatro variables de la Parte 1 (R_i, S^F_ij, S^C_i, S^rep) y la Parte 2 (proceso de llegada). La limpieza se implementó en un único script de Python, ejecutado una sola vez, de manera que las tres integrantes trabajan sobre el mismo dataframe depurado.
+Este documento describe el proceso de limpieza aplicado a `log_operacional_historico.csv`, correspondiente a la etapa compartida de preparación de datos que utilizan las cuatro variables de la Parte 1 (R_i, S^F_ij, S^C_i, S^rep) y la Parte 2 (proceso de llegada). La limpieza se implementó en un único script de Python, ejecutado una sola vez, de manera que las tres integrantes trabajan sobre el mismo dataframe depurado (info limpia).
 
-Todas las decisiones de este documento se tomaron respetando dos reglas del enunciado: los campos vacíos no se interpretan como cero (pueden corresponder a "no aplica" para ese tipo de evento), y `day_id` de este archivo no se cruza con `historical_day` del log de reparaciones.
+Todas las decisiones de este documento se tomaron respetando dos reglas del enunciado: los campos vacíos no se interpretan como cero (pueden corresponder a "no aplica" para ese tipo de evento), y `day_id` de este archivo no se cruza con `historical_day` del log de reparaciones, son independientes.
 
 ## 2. Carga del archivo
 
@@ -22,7 +22,7 @@ El archivo se cargó especificando el separador (`;`), la codificación (`utf-8-
 
 Las nueve columnas numéricas (`event_time`, `planned_order`, `speed_m_per_min`, `duration_min`, `wait_min`, `water_liters`, `towel_count`, `stock_after`, `dissatisfaction`) llegan como texto con coma decimal (por ejemplo, "5,429"). Se reemplazó la coma por un punto y se convirtió cada columna a tipo numérico, preservando los valores vacíos como `NaN` en vez de forzarlos a cero.
 
-Se verificó adicionalmente que `event_time`, `duration_min` y `wait_min` no contuvieran valores negativos (no se encontró ninguno). Se detectó una única fila con `duration_min = 0`, correspondiente a un evento `worker_travel` con `outcome = "interrupted"` (un desplazamiento de personal interrumpido apenas iniciado). Esta fila es válida y no requiere corrección, y de cualquier forma no pertenece a ninguna de las categorías de evento que usan las variables de esta entrega.
+Se verificó adicionalmente que `event_time`, `duration_min` y `wait_min` no contuvieran valores negativos (no se encontró ninguno). Se detectó una única fila con `duration_min = 0`, correspondiente a un evento `worker_travel` con `outcome = "interrupted"` (un desplazamiento de personal interrumpido apenas iniciado). Esta fila es válida y entonces no requiere corrección, y de cualquier forma no pertenece a ninguna de las categorías de evento que usan las variables de esta entrega.
 
 ## 4. Categorías inválidas en `event_type` y `outcome`
 
@@ -35,7 +35,7 @@ Se identificaron dos valores que no existen en el diccionario de datos.
 - `resource` en {`trainers`, `receptionists`, `technicians`} → `worker_travel` (12 filas)
 - `outcome = "arrived"` → `assistance` (2 filas)
 
-Las 41 filas se reclasificaron aplicando esta regla. La verificación posterior mostró que los conteos de `supply_pickup`, `stockout`, `worker_travel` y `assistance` aumentaron exactamente en 26, 1, 12 y 2 respectivamente, confirmando que la reclasificación no generó pérdidas ni duplicaciones.
+Las 41 filas se reclasificaron aplicando estas reglas. La verificación posterior mostró que los conteos de `supply_pickup`, `stockout`, `worker_travel` y `assistance` aumentaron exactamente en 26, 1, 12 y 2 respectivamente, confirmando que la reclasificación no generó pérdidas ni duplicaciones.
 
 **`outcome = "resultado_desconocido"` (40 filas).** De la misma manera, el `event_type` de cada fila permite inferir su resultado real:
 
@@ -238,7 +238,7 @@ A diferencia de fuerza, `resource` (siempre `"treadmill"`), `cardio_planned` (si
 
 ## 5. S^rep_f — Tiempo de reparación de las máquinas
 
-A diferencia de las tres variables anteriores, esta no requiere filtrar filas ni columnas: `log_reparaciones_limpio.csv` es un archivo dedicado exclusivamente a reparaciones (1.307 filas, sin nulos, sin duplicados), donde cada fila ya corresponde a una observación válida de S^rep_f. Se decidió no generar un archivo adicional, ya que exportar las 7 columnas sin ninguna transformación sería una copia idéntica del archivo ya limpio.
+A diferencia de las tres variables anteriores, esta no requiere filtrar filas ni columnas: `log_reparaciones_limpio.csv` es un archivo dedicado exclusivamente a reparaciones (1.307 filas, sin nulos, sin duplicados), donde cada fila ya corresponde a una observación válida de S^rep_f. Se decidió no generar un archivo adicional, ya que exportar las 7 columnas sin ninguna transformación sería una copia idéntica del archivo ya limpio y ya generado.
 
 **Resultado:** se usa directamente `log_reparaciones_limpio.csv` (1.307 filas) para caracterizar S^rep_f, sin archivo adicional.
 
@@ -316,4 +316,4 @@ Si ninguna candidata ajusta bien tras aplicar esto, el capítulo indica evaluar 
 
 ## 6. Estado del archivo
 
-`ajuste.py` contiene únicamente las dos funciones (`p_value_simulado` y `ajustar_distribucion`), sin código ejecutable ni datos de ninguna variable específica. Al final del archivo queda, comentado con `#`, un ejemplo de uso con reparación, solo como referencia de sintaxis para quien lo importe, sin que se ejecute nunca. Persona 1 y Persona 3 pueden importarlo con `from ajuste import ajustar_distribucion`.
+`ajustes.py` contiene únicamente las dos funciones (`p_value_simulado` y `ajustar_distribucion`), sin código ejecutable ni datos de ninguna variable específica. Al final del archivo queda, comentado con `#`, un ejemplo de uso con reparación, solo como referencia de sintaxis para quien lo importe, sin que se ejecute nunca. Persona 1 y Persona 3 pueden importarlo con `from ajustes import ajustar_distribucion`.
