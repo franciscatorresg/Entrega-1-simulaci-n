@@ -77,8 +77,8 @@ plt.ylabel("Frecuencia")
 plt.xticks(rotation=0)
 plt.tight_layout()
 
-plt.savefig("Pauli/distribucion_rutinas.png", dpi=300)
-plt.show()
+plt.savefig("Figuras ajustes/distribucion_rutinas.png", dpi=300)
+#plt.show()
 
 
 # grafico, rutina segun perfil
@@ -95,5 +95,5 @@ plt.xticks(rotation=0)
 plt.legend(title="Rutina")
 plt.tight_layout()
 
-plt.savefig("Pauli/rutina_por_perfil.png", dpi=300)
-plt.show()
+plt.savefig("Figuras ajustes/rutina_por_perfil.png", dpi=300)
+#plt.show()

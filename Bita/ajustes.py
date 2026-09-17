@@ -100,7 +100,7 @@ def ajustar_distribucion(datos, nombre_grupo, candidatas):
         plt.figure()
         stats.probplot(datos, dist=nombre_dist, sparams=parametros, plot=plt)
         plt.title(f'QQ-plot - {nombre_grupo} - {nombre_dist}')
-        plt.savefig(f'qqplot_{nombre_grupo}_{nombre_dist}.png')
+        plt.savefig(f'Figuras ajustes/qqplot_{nombre_grupo}_{nombre_dist}.png')
         plt.close()
 
     #Paso C: histograma con las densidades ajustadas de las candidatas superpuestas
