@@ -4,40 +4,34 @@
 
 ---
 
-# Parte I — Duración de ejercicios de fuerza S^F_{ij}**
+# Parte I — Duración de ejercicios de fuerza S^F_{ij}
 
 *Análisis, comparación y ajuste de la duración de ejercicios de fuerza*
 
-**## 1. Objetivo y alcance**
+## 1. Objetivo y alcance
 
 El objetivo de esta parte es analizar la duración de los ejercicios de fuerza \(S^F_{ij}\), determinar si existen diferencias entre las distintas máquinas y encontrar una distribución de probabilidad adecuada para modelar estas duraciones.
 
 El análisis considera la exploración de los datos, comparación entre categorías y máquinas, pruebas estadísticas y ajuste de distribuciones continuas positivas.
 
-**## 2. Datos utilizados**
+## 2. Datos utilizados
 
 Los datos utilizados corresponden al archivo `Bita/fuerza.csv`, obtenido a partir del log operacional previamente limpiado.
-
 El archivo contiene información de los ejercicios, incluyendo `resource`, `routine`, `outcome`, `duration_min` y `profile`. La variable principal del análisis es `duration_min`, que representa la duración del ejercicio en minutos.
 
-**## 3. Selección de los ejercicios**
+## 3. Selección de los ejercicios
 
-Para construir \(S^F_{ij}\) se consideran los ejercicios con:
-
-`outcome = "completed"`
+Para construir \(S^F_{ij}\) se consideran los ejercicios con: `outcome = "completed"` y `outcome = "completed_failed"`
 
 Los ejercicios que no fueron completados no se utilizan para estimar la duración. Además, existen 4 ejercicios completados sin `duration_min`, los cuales deben descartarse porque no existe información suficiente para reconstruir su duración.
 
-**## 4. Análisis exploratorio**
+## 4. Análisis exploratorio
 
-Se calcularon estadísticas descriptivas y se generaron histogramas y boxplots para estudiar la distribución de las duraciones.
+Se calcularon estadísticas descriptivas y se generaron histogramas y boxplots para estudiar la distribución de las duraciones. Se revisaron media, mediana, desviación estándar, mínimo, máximo, percentiles, asimetría, curtosis y posibles valores atípicos.
 
-Se revisaron media, mediana, desviación estándar, mínimo, máximo, percentiles, asimetría, curtosis y posibles valores atípicos.
-
-**## 5. Resultados generales**
+## 5. Resultados generales
 
 El archivo `fuerza.csv` contiene 46.612 registros antes de aplicar filtros adicionales.
-
 Los principales resultados de duración son:
 
 | Medida | Valor |
@@ -54,19 +48,13 @@ Los principales resultados de duración son:
 
 La duración presenta asimetría positiva, por lo que existe una cola hacia valores de duración mayores.
 
-**## 6. Valores atípicos**
+## 6. Valores atípicos
 
-Se utilizó el criterio del rango intercuartílico:
-
-\[
-IQR=Q_3-Q_1=4,17
-\]
-
-El límite superior obtenido fue aproximadamente 16,39 minutos.
+Se utilizó el criterio del rango intercuartílico y el límite superior obtenido fue aproximadamente 16,39 minutos.
 
 Se identificaron 960 observaciones potencialmente atípicas, correspondientes aproximadamente al 2% de los datos. Estas observaciones no se eliminaron automáticamente, ya que una duración elevada puede corresponder a un ejercicio real.
 
-**## 7. Agrupación de las máquinas**
+## 7. Comparación por categoría
 
 Las máquinas fueron agrupadas inicialmente en cuatro categorías:
 
@@ -79,9 +67,7 @@ Las máquinas fueron agrupadas inicialmente en cuatro categorías:
 
 La agrupación permite estudiar primero si existen diferencias generales entre tipos de ejercicio y posteriormente entre máquinas específicas.
 
-**## 8. Comparación por categoría**
-
-Los resultados descriptivos fueron:
+Luego, los resultados descriptivos fueron:
 
 | Categoría | n | Media | Mediana | Desv. estándar |
 |---|---:|---:|---:|---:|
@@ -92,25 +78,12 @@ Los resultados descriptivos fueron:
 
 Descriptivamente, piernas y multifuncional presentan duraciones mayores, mientras que jalón presenta las menores.
 
-**## 9. Kruskal-Wallis por categoría**
+## 8. Kruskal-Wallis por categoría
 
 Se aplicó una prueba de Kruskal-Wallis para comparar las distribuciones de duración entre las cuatro categorías.
+Rechazando la hipótesis nula de igualdad de distribuciones entre categorías. Existe evidencia de diferencias en la duración según la categoría de máquina.
 
-Se obtuvo:
-
-\[
-H=494,131
-\]
-
-con:
-
-\[
-p\approx0
-\]
-
-Por lo tanto, se rechaza la hipótesis nula de igualdad de distribuciones entre categorías. Existe evidencia de diferencias en la duración según la categoría de máquina.
-
-**## 10. Comparación por máquina**
+## 9. Comparación por máquina
 
 Se realizó posteriormente la comparación individual entre las diez máquinas.
 
@@ -129,26 +102,13 @@ Se realizó posteriormente la comparación individual entre las diez máquinas.
 
 Se observa especialmente que `leg_press` presenta una duración promedio superior al resto.
 
-**## 11. Kruskal-Wallis por máquina**
+## 10. Kruskal-Wallis por máquina
 
-La prueba de Kruskal-Wallis entre las diez máquinas entregó:
+La prueba de Kruskal-Wallis entre las diez máquinas entregó que existe evidencia estadística de diferencias entre las distribuciones de duración de las distintas máquinas.
 
-\[
-H=6118,509
-\]
-
-con:
-
-\[
-p\approx0
-\]
-
-Por lo tanto, existe evidencia estadística de diferencias entre las distribuciones de duración de las distintas máquinas.
-
-**## 12. Comparación dentro de cada categoría**
+## 11. Comparación dentro de cada categoría
 
 También se verificó si las máquinas pertenecientes a una misma categoría podían considerarse equivalentes.
-
 Los resultados fueron:
 
 | Categoría | H | Resultado |
@@ -159,33 +119,28 @@ Los resultados fueron:
 | Multifuncional | — | Solo contiene `cable` |
 
 Las diferencias también aparecen dentro de las categorías.
-
-**## 13. Decisión sobre el nivel de modelación**
+## 12. Decisión sobre el nivel de modelación
 
 Debido a las diferencias observadas entre máquinas, se decidió modelar la duración a nivel de **máquina**, en lugar de utilizar una única distribución para cada categoría.
 
 Por ejemplo, dentro de piernas:
-
 - `leg_press`: media 10,98 min.
 - `leg_curl`: media 7,65 min.
 - `leg_extension`: media 7,54 min.
 
 Por lo tanto, agrupar las tres máquinas bajo una sola distribución perdería información relevante.
 
-**## 14. Distribuciones candidatas**
+## 13. Distribuciones candidatas
 
 Para cada máquina se consideraron tres distribuciones continuas positivas:
-
 - Gamma.
 - Lognormal.
 - Weibull.
-
 Estas distribuciones fueron utilizadas como candidatas para representar la duración de los ejercicios.
 
-**## 15. Procedimiento de ajuste**
+## 14. Ajuste
 
 El ajuste se realizó mediante el módulo `Bita/ajustes.py`.
-
 Para cada máquina se:
 
 1. calcularon estadísticas descriptivas;
@@ -196,15 +151,9 @@ Para cada máquina se:
 6. revisaron gráficos QQ;
 7. seleccionó la distribución correspondiente.
 
-Se utilizó:
+Se utilizó alpha=0,05 como nivel de significancia.
 
-\[
-\alpha=0,05
-\]
-
-como nivel de significancia.
-
-**## 16. Resultados de los ajustes**
+## 15. Resultados de los ajustes
 
 Las distribuciones seleccionadas fueron:
 
@@ -223,7 +172,7 @@ Las distribuciones seleccionadas fueron:
 
 La Weibull resultó ser la distribución seleccionada para la mayoría de las máquinas.
 
-**## 17. Parámetros estimados**
+## 16. Parámetros estimados
 
 Los parámetros de los modelos seleccionados fueron:
 
@@ -242,7 +191,7 @@ Los parámetros de los modelos seleccionados fueron:
 
 Los parámetros corresponden a la parametrización utilizada por `scipy.stats.fit`.
 
-**## 18. Ejemplo de ajuste: `leg_press`**
+## 17. Ejemplo de ajuste: `leg_press`
 
 Para `leg_press` se compararon las tres distribuciones:
 
@@ -254,37 +203,20 @@ Para `leg_press` se compararon las tres distribuciones:
 
 Weibull obtuvo el menor estadístico KS y fue seleccionada para representar la duración de `leg_press`.
 
-**## 19. Código utilizado**
+## 18. Código utilizado
 
 El análisis se encuentra principalmente en: `Pauli/analisis_fuerza.py`
-
 El ajuste de distribuciones utiliza: `Bita/ajustes.py`
 
-## 20. Estado actual de \(S^F_{ij}\)
 
-Hasta este punto se completó:
-
-exploración de los datos;
-clasificación de máquinas;
-comparación por categoría;
-comparación por máquina;
-pruebas de Kruskal-Wallis;
-decisión de modelar por máquina;
-ajuste de Gamma, Lognormal y Weibull;
-evaluación mediante KS y QQ plots;
-selección de una distribución para cada máquina.
-
-Queda pendiente utilizar estos modelos dentro de la simulación y verificar que el filtro definitivo de ejercicios completados sea aplicado de forma consistente.
-
-**# Parte II — Rutina \(R_i\)**
+# Parte II — Rutina R_i
 
 *Análisis de la rutina asignada a cada visita y su relación con el perfil del usuario.*
-
 ---
 
-**## 13. \(R_i\) — Rutina asignada a la sesión**
+## 1. Rutina asignada a la sesión
 
-Para caracterizar \(R_i\), se utilizaron las filas correspondientes a eventos `visit` del log operacional. Cada visita se representa mediante una observación con su `day_id`, `user_id`, `profile` y `routine`, obteniéndose un total de **15.431 visitas**.
+Para caracterizar R_i, se utilizaron las filas correspondientes a eventos `visit` del log operacional. Cada visita se representa mediante una observación con su `day_id`, `user_id`, `profile` y `routine`, obteniéndose un total de **15.431 visitas**.
 
 No se encontraron valores nulos en ninguna de las cuatro variables utilizadas.
 
@@ -315,9 +247,9 @@ La distribución se visualiza en `distribucion_rutinas.png`.
 
 ---
 
-**## 14. Distribución de \(R_i\) según perfil**
+## 2. Distribución de R_i según perfil
 
-Se analizó adicionalmente la distribución de las rutinas dentro de cada perfil (`express`, `flexible`, `intense` y `standard`), con el objetivo de verificar si la composición de \(R_i\) es similar entre perfiles.
+Se analizó adicionalmente la distribución de las rutinas dentro de cada perfil (`express`, `flexible`, `intense` y `standard`), con el objetivo de verificar si la composición de R_i es similar entre perfiles.
 
 La tabla de frecuencias observada fue:
 
@@ -343,9 +275,9 @@ La comparación visual se encuentra en `rutina_por_perfil.png`.
 
 ---
 
-**## 15. Asociación entre perfil y rutina**
+## 3. Asociación entre perfil y rutina
 
-Para evaluar formalmente si la distribución de \(R_i\) es independiente del perfil, se aplicó una prueba de independencia chi-cuadrado sobre la tabla de contingencia `profile × routine`.
+Para evaluar formalmente si la distribución de R_i es independiente del perfil, se aplicó una prueba de independencia chi-cuadrado sobre la tabla de contingencia `profile × routine`.
 
 Se plantearon las hipótesis:
 
@@ -367,13 +299,12 @@ Los resultados fueron:
 
 Dado que el p-value es menor que \(\alpha=0,05\), se **rechaza \(H_0\)**. Por lo tanto, existe evidencia estadísticamente significativa de una **asociación entre el perfil y la rutina**.
 
-Este resultado indica que la distribución de \(R_i\) no es homogénea entre los perfiles observados. La prueba identifica una asociación estadística, pero no implica por sí misma una relación causal entre el perfil y la rutina.
+Este resultado indica que la distribución de R_i no es homogénea entre los perfiles observados. La prueba identifica una asociación estadística, pero no implica por sí misma una relación causal entre el perfil y la rutina.
 
----
 
-**## 16. Resultado final para \(R_i\)**
+## 4. Resultado final para R_i
 
-A partir de las 15.431 visitas analizadas, \(R_i\) queda caracterizada mediante las cinco rutinas definidas en el modelo. La distribución global es:
+A partir de las 15.431 visitas analizadas, R_i queda caracterizada mediante las cinco rutinas definidas en el modelo. La distribución global es:
 - P(R_i=upper)=0,2389
 - P(R_i=pull)=0,2002
 - P(R_i=legs)=0,1982
@@ -390,7 +321,7 @@ Los resultados utilizados en este análisis se guardaron en:
 - `Pauli/distribucion_rutinas.png`
 - `Pauli/rutina_por_perfil.png`
 
-## 24. Cálculo de las probabilidades
+## 5. Cálculo de las probabilidades
 
 La probabilidad empírica de cada rutina se obtiene mediante:
 
@@ -408,7 +339,7 @@ Para esto se puede utilizar una tabla de contingencia y una prueba chi-cuadrado 
 
 El objetivo es determinar si las proporciones de rutina son similares entre los distintos perfiles.
 
-## 26. Estado actual de \(R_i\)
+## 6. Estado actual de R_i
 
 Hasta este punto se tienen identificadas las cinco categorías de rutina y sus frecuencias observadas.
 
@@ -416,7 +347,7 @@ Queda pendiente calcular las probabilidades definitivas utilizando exactamente e
 
 # Parte III — Archivos y resultados
 
-## 27. Archivos utilizados
+## 1. Archivos utilizados
 
 Los principales archivos utilizados en este análisis son:
 
@@ -425,10 +356,10 @@ Bita/ajustes.py: módulo para ajuste de distribuciones.
 Pauli/analisis_fuerza.py: script principal del análisis de fuerza.
 Pauli/Avances: documentación de los avances realizados.
 
-## 28. Resultados obtenidos
+## 2. Resultados obtenidos
 
 El análisis permitió determinar que la duración de los ejercicios presenta diferencias estadísticamente significativas entre categorías y, especialmente, entre máquinas.
 
 Por esta razón, el modelo de \(S^F_{ij}\) se está construyendo a nivel de máquina, utilizando distribuciones Gamma, Lognormal o Weibull según el comportamiento observado.
 
-Para \(R_i\), se identificaron las cinco categorías establecidas en el enunciado y se obtuvieron sus frecuencias para posteriormente calcular sus probabilidades empíricas.
+Para R_i, se identificaron las cinco categorías establecidas en el enunciado y se obtuvieron sus frecuencias para posteriormente calcular sus probabilidades empíricas.
