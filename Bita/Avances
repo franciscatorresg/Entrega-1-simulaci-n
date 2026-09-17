@@ -253,7 +253,7 @@ A diferencia de las tres variables anteriores, esta no requiere filtrar filas ni
 
 ---
 
-# Parte IV — Módulo de ajuste y test de distribuciones (`ajuste.py`)
+# Parte IV — Módulo de ajuste y test de distribuciones (`ajustes.py`)
 
 *Código genérico y reutilizable para caracterizar las tres variables continuas de la Parte 1 (S^F_ij, S^C_i, S^rep), a usar por las tres integrantes*
 
@@ -317,3 +317,68 @@ Si ninguna candidata ajusta bien tras aplicar esto, el capítulo indica evaluar 
 ## 6. Estado del archivo
 
 `ajuste.py` contiene únicamente las dos funciones (`p_value_simulado` y `ajustar_distribucion`), sin código ejecutable ni datos de ninguna variable específica. Al final del archivo queda, comentado con `#`, un ejemplo de uso con reparación, solo como referencia de sintaxis para quien lo importe, sin que se ejecute nunca. Persona 1 y Persona 3 pueden importarlo con `from ajuste import ajustar_distribucion`.
+
+# Parte V — Caracterización de S^rep (`srep.py`)
+
+*Análisis real de la variable de tiempo de reparación, usando `ajustar_distribucion` de `ajuste.py` sobre `log_reparaciones_limpio.csv`*
+
+## 1. Objetivo y alcance
+
+Este archivo contiene únicamente el análisis específico de S^rep: decisión de agrupación, selección de candidatas, ajuste y test de bondad de ajuste. No contiene la función `ajustar_distribucion` en sí (vive en `ajuste.py` y se importa), ni el filtro que genera `log_reparaciones_limpio.csv` (resuelto en la limpieza del log de reparaciones, Parte II).
+
+## 2. Decisión de agrupación
+
+**Nivel 1: ¿se puede modelar S^rep conjuntamente?** Se comparó `repair_duration_min` entre las 11 categorías de `machine_type` mediante boxplot y un test de Kruskal-Wallis. El test rechazó $H_0$ con margen amplio ($H=248{,}59$; $p<0{,}001$), confirmando que el tiempo de reparación no es homogéneo entre tipos de máquina y que la variable requiere separarse en grupos.
+
+**Nivel 2: elección del nivel de agrupación.** En vez de definir grupos a partir de la inspección visual del boxplot, se usó la columna `Categoría` del diccionario de datos (`diccionario_logs.xlsx`, hoja "Recursos"), que clasifica las 11 máquinas en 5 categorías funcionales: Cardio, Empuje, Jalón, Piernas y Multifuncional. Este criterio es consistente con el que usa Persona 1 para S^F_ij, evitando que el informe use dos lógicas de agrupación distintas para máquinas de gimnasio.
+
+| Categoría | Máquinas | N |
+|---|---|---|
+| Empuje | chest_press, shoulder_press, chest_fly | 388 |
+| Jalón | lat_pulldown, seated_row, biceps_curl | 362 |
+| Piernas | leg_press, leg_curl, leg_extension | 347 |
+| Multifuncional | cable | 117 |
+| Cardio | treadmill | 93 |
+
+Un Kruskal-Wallis a nivel de estas 5 categorías también rechazó $H_0$ ($H=246{,}03$; $p<0{,}001$), con un estadístico casi idéntico al de las 11 máquinas, confirmando que la categoría captura prácticamente toda la diferencia relevante.
+
+**Verificación de homogeneidad interna.** Para confirmar que agrupar por categoría no mezcla máquinas realmente distintas entre sí, se corrió un Kruskal-Wallis adicional dentro de cada categoría con más de una máquina (Empuje, Jalón, Piernas; Cardio y Multifuncional tienen una sola máquina cada una y no requieren este chequeo). Ninguno rechazó $H_0$:
+
+| Categoría | H | p-value |
+|---|---|---|
+| Empuje | 0,2029 | 0,9035 |
+| Jalón | 1,0230 | 0,5996 |
+| Piernas | 1,3461 | 0,5101 |
+
+Con esto queda justificado el nivel de agrupación: hay diferencia real entre categorías, y no hay diferencia significativa dentro de cada una.
+
+## 3. Selección de candidatas
+
+Se aplicó el criterio de contexto documentado en la Parte IV: variable continua, positiva, sin cota superior natural, familias candidatas Exponencial, Gamma, Lognormal y Weibull. A diferencia de la prueba de validación (Parte IV, sección 4), no se aplicó el filtro de coeficiente de variación para descartar la Exponencial de antemano; se decidió testear las 4 candidatas directamente con el test de bondad de ajuste en cada una de las 5 categorías, dejando que el test (evidencia directa, con p-value) decida en vez de una heurística previa (evidencia indirecta).
+
+## 4. Ajuste y resultados por categoría
+
+Se aplicó `ajustar_distribucion` una vez por cada una de las 5 categorías, con las 4 candidatas de contexto. La Exponencial fue rechazada en las 5 categorías sin excepción, consistente con el CV observado en la prueba de validación inicial.
+
+| Categoría | Distribución elegida | p-value | Estado |
+|---|---|---|---|
+| Piernas | weibull_min | 0,5080 | Ajuste válido (única no rechazada; gamma y lognorm cayeron en zona ambigua y fueron rechazadas tras bootstrap) |
+| Jalón | lognorm | 0,9956 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Multifuncional | lognorm | 0,7418 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Empuje | lognorm | 0,0675 | Mejor aproximación disponible; ninguna candidata pasa el test formal (ver limitación) |
+| Cardio | lognorm | 0,4634 | Mejor aproximación disponible entre 3 empatadas (ver limitación) |
+
+## 5. Limitaciones documentadas
+
+**Empuje: ninguna candidata ajusta formalmente.** Las 4 candidatas fueron rechazadas, incluso lognorm tras la corrección por bootstrap (p-value simulado = 0,0). El histograma muestra un pico entre 10-20 min y un bulto secundario entre 30-40 min que ninguna familia unimodal captura. Se verificó si este patrón se explicaba por `unit_id` (unidad física), `failure_time` (hora de la falla) o `cell` (ubicación), separando las observaciones en dos grupos según el bulto (≤25 min vs. >25 min): ninguna de las tres variables mostró diferencia entre esos grupos, y el mismo patrón de doble bulto aparece de forma consistente en las 3 máquinas de Empuje por separado, no solo al agruparlas. Se concluye que es variabilidad real del proceso de reparación no explicada por las columnas disponibles, y se reporta lognorm como la mejor aproximación empírica, dejando explícito que no está validada estadísticamente.
+
+**Cardio: posible censura no documentada en 50 min.** Las 3 candidatas no exponenciales no fueron rechazadas, pero se detectó que 13 de las 93 reparaciones de `treadmill` (14,0%) tienen `repair_duration_min` exactamente igual a 50 min, muy por encima de lo observado en cualquiera de las otras 10 máquinas (entre 0,7% y 2,3% de observaciones en su propio máximo). El diccionario de datos no documenta ningún tope para esta variable. Este patrón es indicativo de censura o un límite operacional no informado en el enunciado. Se reporta lognorm (mejor p-value entre las 3 candidatas) como la mejor aproximación disponible, dejando explícito que ~14% de la muestra podría no representar la duración real de la reparación.
+
+## 6. Estado del archivo
+
+`srep.py` importa `ajustar_distribucion` desde `ajuste.py` y contiene: carga de `log_reparaciones_limpio.csv`, verificación inicial, decisión de agrupación (boxplot y Kruskal-Wallis en dos niveles más verificación de homogeneidad interna), y el ajuste final de las 5 categorías. Genera 6 boxplots, hasta 20 QQ-plots y 5 histogramas.
+
+
+
+
+
