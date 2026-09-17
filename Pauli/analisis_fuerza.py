@@ -72,7 +72,7 @@ plt.xlabel("Duración del ejercicio (minutos)")
 plt.ylabel("Frecuencia")
 plt.title("Distribución de la duración de ejercicios de fuerza")
 plt.tight_layout()
-plt.savefig("Pauli/histograma_fuerza.png", dpi=300)
+plt.savefig("Figuras ajustes/histograma_fuerza.png", dpi=300)
 # la siguente linea se deja comentada por rapidez al ejecutar el codigo 
 # pero se puede descomentar para visualizar directamente el histograma
 #plt.show()
@@ -84,7 +84,7 @@ plt.boxplot(duracion, vert=False)
 plt.xlabel("Duración del ejercicio (minutos)")
 plt.title("Boxplot de la duración de ejercicios de fuerza")
 plt.tight_layout()
-plt.savefig("Pauli/boxplot_fuerza.png", dpi=300)
+plt.savefig("Figuras ajustes/boxplot_fuerza.png", dpi=300)
 # la siguente linea se deja comentada por rapidez al ejecutar el codigo 
 # pero se puede descomentar para visualizar directamente el histograma
 #plt.show()
@@ -133,7 +133,7 @@ plt.xlabel("Categoría de máquina")
 plt.ylabel("Duración (minutos)")
 plt.title("Duración de ejercicios de fuerza por categoría")
 plt.tight_layout()
-plt.savefig("Pauli/boxplot_por_categoria.png", dpi=300)
+plt.savefig("Figuras ajustes/boxplot_por_categoria.png", dpi=300)
 #plt.show()
 
 # Boxplot por maquina
@@ -157,7 +157,7 @@ plt.xticks(rotation=45)
 
 plt.tight_layout()
 
-plt.savefig("Pauli/boxplot_por_maquina.png", dpi=300)
+plt.savefig("Figuras ajustes/boxplot_por_maquina.png", dpi=300)
 #plt.show()
 
 # Prueba de kruskal-wallis por categoría
@@ -257,8 +257,6 @@ tabla_leg_press = ajustar_distribucion(
 print("\nResultados:")
 print(tabla_leg_press)
 
-print("\n========== FIN AJUSTE LEG PRESS ==========")
-
 
 # Ajuste de distribuciones para todas las maquinas
 
@@ -333,9 +331,9 @@ tabla_seleccion["p_value_final"] = np.where(
     tabla_seleccion["p_value_simulado"],
     tabla_seleccion["p_value"])
 
-print("\n\n========== TABLA FINAL PARA INFORME ==========")
+print("\n\nTABLA FINAL PARA INFORME")
 
-columnas_informe = [
+columnas_final = [
     "grupo",
     "distribucion_seleccionada",
     "parametros",
@@ -344,14 +342,14 @@ columnas_informe = [
     "conclusion",
     "criterio"]
 
-print(tabla_seleccion[columnas_informe]
+print(tabla_seleccion[columnas_final]
     .to_string(index=False))
 
-tabla_seleccion[columnas_informe].to_csv(
+tabla_seleccion[columnas_final].to_csv(
     "Pauli/modelo_fuerza_final.csv",
     index=False)
 
-print("\n\n========== DISTRIBUCIÓN SELECCIONADA POR MÁQUINA ==========")
+print("\n\nDISTRIBUCIÓN SELECCIONADA POR MÁQUINA")
 print(tabla_seleccion.to_string(index=False))
 
 # Guardar tabla final
@@ -363,8 +361,7 @@ print("Pauli/seleccion_distribuciones_fuerza.csv")
 
 
 # Parametros finales del modelo de fuerza
-
-print("\n\n========== PARÁMETROS FINALES ==========")
+print("\n\nPARÁMETROS FINALES")
 
 for _, fila in tabla_seleccion.iterrows():
 
@@ -405,20 +402,15 @@ tabla_descriptiva = pd.DataFrame(resumen_descriptivo)
 
 # Unir descriptivas con la selección de distribución
 tabla_final_fuerza = tabla_descriptiva.merge(
-    tabla_seleccion[
-        [
-            "grupo",
+    tabla_seleccion[["grupo",
             "distribucion_seleccionada",
             "parametros",
             "estadistico_KS",
             "p_value_final",
             "conclusion",
-            "criterio"
-        ]
-    ],
+            "criterio"]],
     on="grupo",
-    how="left"
-)
+    how="left")
 
 # Ordenar por máquina
 tabla_final_fuerza = tabla_final_fuerza.sort_values("grupo")

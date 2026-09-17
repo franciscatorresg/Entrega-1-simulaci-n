@@ -64,7 +64,8 @@ def ajustar_distribucion(datos, nombre_grupo, candidatas):
     plt.boxplot(datos, orientation='horizontal')
     plt.title(f'Boxplot - {nombre_grupo}')
     plt.xlabel('Valor')
-    plt.savefig(f'boxplot_{nombre_grupo}.png')
+    plt.tight_layout()
+    plt.savefig(f'Figuras ajustes/boxplot_{nombre_grupo}.png')
     plt.close()
 
     #Paso B: estimar parametros, testear bondad de ajuste (KS), simular p-value si es ambiguo, y generar QQ-plot
@@ -115,7 +116,7 @@ def ajustar_distribucion(datos, nombre_grupo, candidatas):
     plt.xlabel('Valor')
     plt.ylabel('Densidad')
     plt.legend()
-    plt.savefig(f'histograma_{nombre_grupo}.png')
+    plt.savefig(f'Figuras ajustes/histograma_{nombre_grupo}.png')
     plt.close()
 
     tabla_resultados = pd.DataFrame(resultados_ajuste)

@@ -1,5 +1,5 @@
 grupo,distribucion_seleccionada,parametros,estadistico_KS,p_value_final,conclusion,criterio
-biceps_curl,weibull_min,"(np.float64(1.8091151173314375), np.float64(2.472538733852419), np.float64(4.386211876876824))",0.017170304758374,0.001,se rechaza H0,Todas rechazadas; menor KS relativo
+biceps_curl,weibull_min,"(np.float64(1.8091151173314375), np.float64(2.472538733852419), np.float64(4.386211876876824))",0.017170304758374,0.0,se rechaza H0,Todas rechazadas; menor KS relativo
 cable,weibull_min,"(np.float64(2.0844496115455406), np.float64(2.7352146158078465), np.float64(6.8923317717187995))",0.023681303815137833,0.03436257260532616,se rechaza H0,Todas rechazadas; menor KS relativo
 chest_fly,gamma,"(np.float64(4.195799549046656), np.float64(1.9163730275391708), np.float64(1.1309633077660952))",0.01723202494130148,0.21845070423037816,no se rechaza H0,No rechazo H0; menor KS entre las candidatas
 chest_press,lognorm,"(np.float64(0.3099245778290903), -0.9587485208220521, np.float64(9.221681076789203))",0.02131612933420801,0.010757099796076983,se rechaza H0,Todas rechazadas; menor KS relativo
