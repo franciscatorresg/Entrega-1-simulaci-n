@@ -4,9 +4,9 @@
 
 ---
 
-**# Parte I — Duración de ejercicios de fuerza \(S^F_{ij}\)**
+# Parte I — Duración de ejercicios de fuerza S^F_{ij}**
 
-*\*Análisis, comparación y ajuste de la duración de ejercicios de fuerza\**
+*Análisis, comparación y ajuste de la duración de ejercicios de fuerza*
 
 **## 1. Objetivo y alcance**
 
@@ -276,41 +276,119 @@ selección de una distribución para cada máquina.
 
 Queda pendiente utilizar estos modelos dentro de la simulación y verificar que el filtro definitivo de ejercicios completados sea aplicado de forma consistente.
 
-# Parte II — Tipo de rutina \(R_i\)
+**# Parte II — Rutina \(R_i\)**
 
-*Distribución del tipo de rutina realizada por los usuarios*
+*Análisis de la rutina asignada a cada visita y su relación con el perfil del usuario.*
 
-## 21. Objetivo
+---
 
-El objetivo es determinar la distribución empírica del tipo de rutina \(R_i\), que corresponde a la rutina realizada por cada usuario.
+**## 13. \(R_i\) — Rutina asignada a la sesión**
 
-Las categorías definidas por el enunciado son: empuje, jalón, piernas, tren superior, cuerpo completo.
+Para caracterizar \(R_i\), se utilizaron las filas correspondientes a eventos `visit` del log operacional. Cada visita se representa mediante una observación con su `day_id`, `user_id`, `profile` y `routine`, obteniéndose un total de **15.431 visitas**.
 
-## 22. Codificación utilizada
+No se encontraron valores nulos en ninguna de las cuatro variables utilizadas.
 
-En el dataset las categorías aparecen como:
+Las rutinas presentes corresponden a las cinco categorías definidas en el modelo:
 
-Código	Categoría
-push	Empuje
-pull	Jalón
-legs	Piernas
-upper	Tren superior
-full_body	Cuerpo completo
+| Valor en los datos | Rutina |
+|---|---|
+| `push` | Empuje |
+| `pull` | Jalón |
+| `legs` | Piernas |
+| `upper` | Tren superior |
+| `full_body` | Cuerpo completo |
 
-Se verificó que las rutinas presentes corresponden a las cinco categorías esperadas.
+La distribución observada fue:
 
-## 23. Frecuencia de las rutinas
+| Rutina | Frecuencia | Proporción |
+|---|---:|---:|
+| `upper` | 3.686 | 23,89% |
+| `pull` | 3.089 | 20,02% |
+| `legs` | 3.058 | 19,82% |
+| `push` | 3.056 | 19,80% |
+| `full_body` | 2.542 | 16,47% |
+| **Total** | **15.431** | **100%** |
 
-Las frecuencias observadas fueron:
+La rutina `upper` presenta la mayor frecuencia, con un **23,89%** de las visitas, mientras que `full_body` presenta la menor, con un **16,47%**. Las rutinas `pull`, `legs` y `push` presentan proporciones cercanas al 20%.
 
-Rutina	Cantidad
-upper	12.393
-full_body	8.809
-legs	8.710
-pull	8.611
-push	8.089
+La distribución se visualiza en `distribucion_rutinas.png`.
 
-upper es la categoría con mayor frecuencia en los datos analizados.
+---
+
+**## 14. Distribución de \(R_i\) según perfil**
+
+Se analizó adicionalmente la distribución de las rutinas dentro de cada perfil (`express`, `flexible`, `intense` y `standard`), con el objetivo de verificar si la composición de \(R_i\) es similar entre perfiles.
+
+La tabla de frecuencias observada fue:
+
+| Perfil | `full_body` | `legs` | `pull` | `push` | `upper` |
+|---|---:|---:|---:|---:|---:|
+| `express` | 337 | 441 | 470 | 428 | 547 |
+| `flexible` | 1.102 | 691 | 671 | 668 | 1.337 |
+| `intense` | 404 | 1.038 | 1.053 | 1.080 | 670 |
+| `standard` | 699 | 888 | 895 | 880 | 1.132 |
+
+Al expresar estas frecuencias como proporciones dentro de cada perfil:
+
+| Perfil | `full_body` | `legs` | `pull` | `push` | `upper` |
+|---|---:|---:|---:|---:|---:|
+| `express` | 15,16% | 19,84% | 21,14% | 19,25% | 24,61% |
+| `flexible` | 24,66% | 15,46% | 15,01% | 14,95% | 29,92% |
+| `intense` | 9,52% | 24,45% | 24,81% | 25,44% | 15,78% |
+| `standard` | 15,55% | 19,76% | 19,92% | 19,58% | 25,19% |
+
+Se observan diferencias en la composición de las rutinas entre perfiles. En particular, `flexible` presenta mayores proporciones de `full_body` y `upper`, mientras que `intense` presenta mayores proporciones de `legs`, `pull` y `push`.
+
+La comparación visual se encuentra en `rutina_por_perfil.png`.
+
+---
+
+**## 15. Asociación entre perfil y rutina**
+
+Para evaluar formalmente si la distribución de \(R_i\) es independiente del perfil, se aplicó una prueba de independencia chi-cuadrado sobre la tabla de contingencia `profile × routine`.
+
+Se plantearon las hipótesis:
+
+\[
+H_0: \text{el perfil y la rutina son independientes}
+\]
+
+\[
+H_1: \text{existe asociación entre el perfil y la rutina}
+\]
+
+Los resultados fueron:
+
+| Estadístico | Valor |
+|---|---:|
+| Chi-cuadrado | 816,0320 |
+| Grados de libertad | 12 |
+| p-value | < 0,05 |
+
+Dado que el p-value es menor que \(\alpha=0,05\), se **rechaza \(H_0\)**. Por lo tanto, existe evidencia estadísticamente significativa de una **asociación entre el perfil y la rutina**.
+
+Este resultado indica que la distribución de \(R_i\) no es homogénea entre los perfiles observados. La prueba identifica una asociación estadística, pero no implica por sí misma una relación causal entre el perfil y la rutina.
+
+---
+
+**## 16. Resultado final para \(R_i\)**
+
+A partir de las 15.431 visitas analizadas, \(R_i\) queda caracterizada mediante las cinco rutinas definidas en el modelo. La distribución global es:
+- P(R_i=upper)=0,2389
+- P(R_i=pull)=0,2002
+- P(R_i=legs)=0,1982
+- P(R_i=push)=0,1980
+- P(R_i=full_body)=0,1647
+
+Además, debido a la asociación estadísticamente significativa encontrada entre perfil y rutina, para una simulación que requiera representar esta dependencia resulta más apropiado considerar las probabilidades de rutina **condicionadas al perfil**, en lugar de utilizar únicamente las probabilidades marginales globales.
+
+Los resultados utilizados en este análisis se guardaron en:
+
+- `Pauli/resultados_rutina.csv`
+- `Pauli/rutina_por_perfil.csv`
+- `Pauli/proporcion_rutina_por_perfil.csv`
+- `Pauli/distribucion_rutinas.png`
+- `Pauli/rutina_por_perfil.png`
 
 ## 24. Cálculo de las probabilidades
 

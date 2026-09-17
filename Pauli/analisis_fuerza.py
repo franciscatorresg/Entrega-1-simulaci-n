@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from Bita.ajustes import ajustar_distribucion
 
-# Primero cargamos los datos
+# Primero cargamos los datos limpios y separados
 df = pd.read_csv("Bita/fuerza.csv")
 
 # Variable de interés
@@ -16,40 +16,30 @@ duracion = df["duration_min"]
 
 # Imprimimos las estadisticas descriptivas
 
-print("========== ESTADÍSTICAS DE S^F_ij ==========")
-
-print("\nCantidad de observaciones:")
+print("ESTADÍSTICAS DE S^F_ij")
+print("\nCant. de observaciones:")
 print(len(duracion))
-
 print("\nEstadísticas descriptivas:")
 print(duracion.describe())
-
 print("\nMedia:")
 print(duracion.mean())
-
 print("\nMediana:")
 print(duracion.median())
-
 print("\nDesviación estándar:")
 print(duracion.std())
-
 print("\nVarianza:")
 print(duracion.var())
-
 print("\nAsimetría (skewness):")
 print(duracion.skew())
-
 print("\nCurtosis:")
 print(duracion.kurtosis())
 
 
 # Estudiamos los percentiles
-
 print("\nPercentiles:")
 
 for p in [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99]:
     print(f"{p*100:.0f}%: {duracion.quantile(p):.4f}")
-
 
 # Vemos outliers segun regla del iqr
 
@@ -61,65 +51,47 @@ IQR = Q3 - Q1
 limite_inferior = Q1 - 1.5 * IQR
 limite_superior = Q3 + 1.5 * IQR
 
-outliers = duracion[
-    (duracion < limite_inferior) |
-    (duracion > limite_superior)
-]
+outliers = duracion[(duracion < limite_inferior) |
+    (duracion > limite_superior)]
 
-print("\n========== OUTLIERS ==========")
+print("\n OUTLIERS")
 
 print(f"Q1: {Q1:.4f}")
 print(f"Q3: {Q3:.4f}")
 print(f"IQR: {IQR:.4f}")
-
 print(f"Límite inferior: {limite_inferior:.4f}")
 print(f"Límite superior: {limite_superior:.4f}")
-
 print(f"\nCantidad de posibles outliers: {len(outliers)}")
 print(f"Porcentaje de posibles outliers: {len(outliers)/len(duracion)*100:.2f}%")
-
 
 # Histograma
 
 plt.figure(figsize=(10, 6))
-
 plt.hist(duracion, bins=40)
-
 plt.xlabel("Duración del ejercicio (minutos)")
 plt.ylabel("Frecuencia")
 plt.title("Distribución de la duración de ejercicios de fuerza")
-
 plt.tight_layout()
-
 plt.savefig("Pauli/histograma_fuerza.png", dpi=300)
-
+# la siguente linea se deja comentada por rapidez al ejecutar el codigo 
+# pero se puede descomentar para visualizar directamente el histograma
 #plt.show()
 
 
 # Boxplot
-
 plt.figure(figsize=(10, 4))
-
 plt.boxplot(duracion, vert=False)
-
 plt.xlabel("Duración del ejercicio (minutos)")
 plt.title("Boxplot de la duración de ejercicios de fuerza")
-
 plt.tight_layout()
-
 plt.savefig("Pauli/boxplot_fuerza.png", dpi=300)
-
+# la siguente linea se deja comentada por rapidez al ejecutar el codigo 
+# pero se puede descomentar para visualizar directamente el histograma
 #plt.show()
 
+# Clasificamos las maquinas por categorías
 
-print("\n========== FIN DEL ANÁLISIS ==========")
-
-# ============================================================
-# CLASIFICACIÓN DE MÁQUINAS POR CATEGORÍA
-# ============================================================
-
-categorias = {
-    "chest_press": "empuje",
+categorias = {"chest_press": "empuje",
     "shoulder_press": "empuje",
     "chest_fly": "empuje",
     "lat_pulldown": "jalón",
@@ -128,76 +100,54 @@ categorias = {
     "leg_press": "piernas",
     "leg_extension": "piernas",
     "leg_curl": "piernas",
-    "cable": "multifuncional"
-}
+    "cable": "multifuncional"}
 
 df["category"] = df["resource"].map(categorias)
 
 
-# ============================================================
-# ESTADÍSTICAS POR CATEGORÍA
-# ============================================================
+# Estadísticas por catgoria
+print("\nDURACIÓN POR CATEGORÍA")
 
-print("\n========== DURACIÓN POR CATEGORÍA ==========")
-
-estadisticas_categoria = df.groupby("category")["duration_min"].agg(
-    ["count", "mean", "median", "std", "min", "max"]
-)
+estadisticas_categoria = df.groupby("category")["duration_min"].agg(["count", "mean", "median", "std", "min", "max"])
 
 print(estadisticas_categoria)
 
 
-# ============================================================
-# BOXPLOT POR CATEGORÍA
-# ============================================================
+# Boxplot por categoria
 
-categorias_orden = [
-    "empuje",
+categorias_orden = ["empuje",
     "jalón",
     "piernas",
-    "multifuncional"
-]
+    "multifuncional"]
 
-datos_categoria = [
-    df[df["category"] == categoria]["duration_min"]
-    for categoria in categorias_orden
-]
+datos_categoria = [df[df["category"] == categoria]["duration_min"]
+    for categoria in categorias_orden]
 
 plt.figure(figsize=(10, 6))
 
 plt.boxplot(
     datos_categoria,
-    tick_labels=categorias_orden
-)
+    tick_labels=categorias_orden)
 
 plt.xlabel("Categoría de máquina")
 plt.ylabel("Duración (minutos)")
 plt.title("Duración de ejercicios de fuerza por categoría")
-
 plt.tight_layout()
-
 plt.savefig("Pauli/boxplot_por_categoria.png", dpi=300)
-
 #plt.show()
 
-
-# ============================================================
-# BOXPLOT POR MÁQUINA
-# ============================================================
-
+# Boxplot por maquina
 maquinas_orden = sorted(df["resource"].unique())
 
 datos_maquina = [
     df[df["resource"] == maquina]["duration_min"]
-    for maquina in maquinas_orden
-]
+    for maquina in maquinas_orden]
 
 plt.figure(figsize=(12, 6))
 
 plt.boxplot(
     datos_maquina,
-    tick_labels=maquinas_orden
-)
+    tick_labels=maquinas_orden)
 
 plt.xlabel("Máquina")
 plt.ylabel("Duración (minutos)")
@@ -208,29 +158,20 @@ plt.xticks(rotation=45)
 plt.tight_layout()
 
 plt.savefig("Pauli/boxplot_por_maquina.png", dpi=300)
-
 #plt.show()
 
-# ============================================================
-# PRUEBA DE KRUSKAL-WALLIS POR CATEGORÍA
-# ============================================================
-
+# Prueba de kruskal-wallis por categoría
 from scipy.stats import kruskal
+print("\nKRUSKAL-WALLIS POR CATEGORÍA")
 
-print("\n========== KRUSKAL-WALLIS POR CATEGORÍA ==========")
-
-grupos_categoria = [
-    df[df["category"] == categoria]["duration_min"]
-    for categoria in categorias_orden
-]
+grupos_categoria = [df[df["category"] == categoria]["duration_min"]
+    for categoria in categorias_orden]
 
 H_categoria, p_categoria = kruskal(*grupos_categoria)
 
 print(f"Estadístico H: {H_categoria:.4f}")
 print(f"p-value: {p_categoria:.10f}")
-
 alpha = 0.05
-
 if p_categoria < alpha:
     print("Resultado: se rechaza H0.")
     print("Existe evidencia de diferencias entre las categorías.")
@@ -239,16 +180,11 @@ else:
     print("No existe evidencia suficiente de diferencias entre las categorías.")
 
 
-# ============================================================
-# PRUEBA DE KRUSKAL-WALLIS POR MÁQUINA
-# ============================================================
+# Kruskal-wallis por maquina
+print("\nKRUSKAL-WALLIS POR MÁQUINA")
 
-print("\n========== KRUSKAL-WALLIS POR MÁQUINA ==========")
-
-grupos_maquina = [
-    df[df["resource"] == maquina]["duration_min"]
-    for maquina in maquinas_orden
-]
+grupos_maquina = [df[df["resource"] == maquina]["duration_min"]
+    for maquina in maquinas_orden]
 
 H_maquina, p_maquina = kruskal(*grupos_maquina)
 
@@ -263,12 +199,8 @@ else:
     print("No existe evidencia suficiente de diferencias entre las máquinas.")
 
 
-
-# ============================================================
-# KRUSKAL-WALLIS DE MÁQUINAS DENTRO DE CADA CATEGORÍA
-# ============================================================
-
-print("\n========== MÁQUINAS DENTRO DE CADA CATEGORÍA ==========")
+# Kruskal-wallis de maquinas dentro de cada categoría
+print("\nMÁQUINAS DENTRO DE CADA CATEGORÍA")
 
 for categoria in categorias_orden:
 
@@ -278,19 +210,14 @@ for categoria in categorias_orden:
 
     # Si hay más de una máquina, podemos comparar
     if len(maquinas_categoria) > 1:
-
         grupos = [
             df[df["resource"] == maquina]["duration_min"]
-            for maquina in maquinas_categoria
-        ]
-
+            for maquina in maquinas_categoria]
         H, p = kruskal(*grupos)
-
         print(f"\nCategoría: {categoria}")
         print(f"Máquinas: {list(maquinas_categoria)}")
         print(f"Estadístico H: {H:.4f}")
         print(f"p-value: {p:.10f}")
-
         if p < alpha:
             print("Resultado: se rechaza H0.")
             print("Existe evidencia de diferencias entre las máquinas de esta categoría.")
@@ -304,35 +231,28 @@ for categoria in categorias_orden:
         print("No corresponde realizar Kruskal-Wallis.")
 
 
-# ============================================================
-# ESTADÍSTICAS POR MÁQUINA
-# ============================================================
+# Estadisticas por maquina
 
-print("\n========== ESTADÍSTICAS POR MÁQUINA ==========")
+print("\nESTADÍSTICAS POR MÁQUINA")
 
 estadisticas_maquina = df.groupby("resource")["duration_min"].agg(
-    ["count", "mean", "median", "std", "min", "max"]
-)
-
+    ["count", "mean", "median", "std", "min", "max"])
 print(estadisticas_maquina)
 
 
-# ============================================================
-# AJUSTE DE DISTRIBUCIONES PARA LEG PRESS
-# ============================================================
+# Ajuste de distribuciones para leg press
 
 
 datos_leg_press = df[
     df["resource"] == "leg_press"
 ]["duration_min"].values
 
-print("\n========== AJUSTE: LEG PRESS ==========")
+print("\nAJUSTE: LEG PRESS")
 
 tabla_leg_press = ajustar_distribucion(
     datos_leg_press,
     "leg_press",
-    ["gamma", "lognorm", "weibull_min"]
-)
+    ["gamma", "lognorm", "weibull_min"])
 
 print("\nResultados:")
 print(tabla_leg_press)
@@ -340,68 +260,54 @@ print(tabla_leg_press)
 print("\n========== FIN AJUSTE LEG PRESS ==========")
 
 
-# ============================================================
-# AJUSTE DE DISTRIBUCIONES PARA TODAS LAS MÁQUINAS
-# ============================================================
+# Ajuste de distribuciones para todas las maquinas
 
 maquinas = sorted(df["resource"].unique())
-
 resultados_todos = []
 
 for maquina in maquinas:
-
     datos_maquina = df[
         df["resource"] == maquina
     ]["duration_min"].values
-
-    print(f"\n========== AJUSTE: {maquina} ==========")
-
+    print(f"\nAJUSTE: {maquina}")
     resultado = ajustar_distribucion(
         datos_maquina,
         maquina,
-        ["gamma", "lognorm", "weibull_min"]
-    )
-
+        ["gamma", "lognorm", "weibull_min"])
     resultados_todos.append(resultado)
 
-# Unir todos los resultados
+# Unimos todos los resultados
 tabla_ajustes = pd.concat(resultados_todos, ignore_index=True)
 
-print("\n\n========== RESUMEN DE AJUSTES ==========")
+print("\n\nRESUMEN DE AJUSTES")
 print(tabla_ajustes)
 
 # Guardar resultados
 tabla_ajustes.to_csv(
     "Pauli/resultados_ajuste_fuerza.csv",
-    index=False
-)
+    index=False)
 
 print("\nResultados guardados en:")
 print("Pauli/resultados_ajuste_fuerza.csv")
 
-# ============================================================
-# SELECCIÓN DE DISTRIBUCIÓN POR MÁQUINA
-# ============================================================
+# Seleccion de distribución por maquina
 
 def seleccionar_distribucion(grupo):
 
     # Primero consideramos las distribuciones que NO rechazan H0
     aceptadas = grupo[
-        grupo["conclusion"] == "no se rechaza H0"
-    ]
+        grupo["conclusion"] == "no se rechaza H0"]
 
     if len(aceptadas) > 0:
         # Si hay alguna compatible con los datos,
         # elegimos la de menor estadístico KS
         seleccionada = aceptadas.loc[
-            aceptadas["estadistico"].idxmin()
-        ]
+            aceptadas["estadistico"].idxmin()]
         criterio = "No rechazo H0; menor KS entre las candidatas"
     else:
         # Si todas son rechazadas, elegimos la de menor KS
         seleccionada = grupo.loc[
-            grupo["estadistico"].idxmin()
-        ]
+            grupo["estadistico"].idxmin()]
         criterio = "Todas rechazadas; menor KS relativo"
 
     return pd.Series({
@@ -411,27 +317,21 @@ def seleccionar_distribucion(grupo):
         "p_value_simulado": seleccionada["p_value_simulado"],
         "conclusion": seleccionada["conclusion"],
         "criterio": criterio,
-        "parametros": seleccionada["parametros"]
-    })
+        "parametros": seleccionada["parametros"]})
 
 
-tabla_seleccion = (
-    tabla_ajustes
+tabla_seleccion = (tabla_ajustes
     .groupby("grupo")
     .apply(seleccionar_distribucion)
-    .reset_index()
-)
+    .reset_index())
 
 
-# ============================================================
-# P-VALUE FINAL UTILIZADO PARA LA DECISIÓN
-# ============================================================
+# P-value final para tomar la decision
 
 tabla_seleccion["p_value_final"] = np.where(
     tabla_seleccion["p_value_simulado"].notna(),
     tabla_seleccion["p_value_simulado"],
-    tabla_seleccion["p_value"]
-)
+    tabla_seleccion["p_value"])
 
 print("\n\n========== TABLA FINAL PARA INFORME ==========")
 
@@ -442,35 +342,27 @@ columnas_informe = [
     "estadistico_KS",
     "p_value_final",
     "conclusion",
-    "criterio"
-]
+    "criterio"]
 
-print(
-    tabla_seleccion[columnas_informe]
-    .to_string(index=False)
-)
+print(tabla_seleccion[columnas_informe]
+    .to_string(index=False))
 
 tabla_seleccion[columnas_informe].to_csv(
     "Pauli/modelo_fuerza_final.csv",
-    index=False
-)
+    index=False)
 
 print("\n\n========== DISTRIBUCIÓN SELECCIONADA POR MÁQUINA ==========")
 print(tabla_seleccion.to_string(index=False))
 
 # Guardar tabla final
-tabla_seleccion.to_csv(
-    "Pauli/seleccion_distribuciones_fuerza.csv",
-    index=False
-)
+tabla_seleccion.to_csv("Pauli/seleccion_distribuciones_fuerza.csv",
+    index=False)
 
 print("\nTabla de selección guardada en:")
 print("Pauli/seleccion_distribuciones_fuerza.csv")
 
 
-# ============================================================
-# PARÁMETROS FINALES DEL MODELO DE FUERZA
-# ============================================================
+# Parametros finales del modelo de fuerza
 
 print("\n\n========== PARÁMETROS FINALES ==========")
 
@@ -488,9 +380,7 @@ for _, fila in tabla_seleccion.iterrows():
     print(f"Criterio: {fila['criterio']}")
 
 
-    # ============================================================
-# TABLA MAESTRA: ANÁLISIS DE DURACIÓN DE FUERZA
-# ============================================================
+# Tabla resumen, analisis de duracion de ejecicios de fuerza
 
 resumen_descriptivo = []
 
@@ -533,22 +423,16 @@ tabla_final_fuerza = tabla_descriptiva.merge(
 # Ordenar por máquina
 tabla_final_fuerza = tabla_final_fuerza.sort_values("grupo")
 
-print("\n\n============================================================")
-print("           TABLA MAESTRA - MODELO DE FUERZA")
-print("============================================================")
-
+print("\n\nTABLA RESUMEN - MODELO DE FUERZA")
 print(
     tabla_final_fuerza.to_string(
         index=False,
-        float_format=lambda x: f"{x:.4f}"
-    )
-)
+        float_format=lambda x: f"{x:.4f}"))
 
 # Guardar
 tabla_final_fuerza.to_csv(
     "Pauli/tabla_maestra_fuerza.csv",
-    index=False
-)
+    index=False)
 
 print("\nTabla maestra guardada en:")
 print("Pauli/tabla_maestra_fuerza.csv")
