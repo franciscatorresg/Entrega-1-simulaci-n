@@ -1,8 +1,9 @@
+import os
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import matplotlib.pyplot as plt
-from ajustes import ajustar_distribucion
+from ajustes import ajustar_distribucion, CARPETA_FIGURAS
 
 #Paso 1: cargar log_reparaciones_limpio.csv y verificar que se ve como se espera
 df_rep = pd.read_csv('log_reparaciones_limpio.csv')
@@ -21,7 +22,7 @@ plt.ylabel('repair_duration_min')
 plt.title('repair_duration_min por machine_type')
 plt.xticks(rotation=45, ha='right')
 plt.tight_layout()
-plt.savefig('boxplot_reparacion_por_machine_type.png')
+plt.savefig(os.path.join(CARPETA_FIGURAS, 'boxplot_reparacion_por_machine_type.png'))
 plt.close()
 
 h, p = stats.kruskal(*datos_por_grupo)
@@ -56,7 +57,7 @@ plt.boxplot(datos_por_categoria, tick_labels=orden_cat)
 plt.ylabel('repair_duration_min')
 plt.title('repair_duration_min por categoria')
 plt.tight_layout()
-plt.savefig('boxplot_reparacion_por_categoria.png')
+plt.savefig(os.path.join(CARPETA_FIGURAS, 'boxplot_reparacion_por_categoria.png'))
 plt.close()
 
 h_cat, p_cat = stats.kruskal(*datos_por_categoria)

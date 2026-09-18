@@ -296,7 +296,7 @@ Este procedimiento no es específico de ninguna distribución, aplica a cualquie
 
 ## 4. Prueba de validación (no es el análisis final de ninguna variable)
 
-`ajuste.py` se probó de punta a punta usando `repair_duration_min` completo (sin separar por grupo), solo para confirmar que el código corre correctamente con datos reales antes de dárselo a las demás integrantes:
+`ajustes.py` se probó de punta a punta usando `repair_duration_min` completo (sin separar por grupo), solo para confirmar que el código corre correctamente con datos reales antes de dárselo a las demás integrantes:
 
 - Asimetría: 0,662; curtosis: -0,269; 2 atípicos de 1.307 (0,15%) por regla IQR.
 - Con `gamma`, `lognorm` y `weibull_min`: `weibull_min` dio un p-value KS de 0,090 (zona ambigua), y el p-value simulado resultó 0,0, revirtiendo la conclusión de "no se rechaza" a "se rechaza $H_0$".
@@ -376,3 +376,47 @@ Se aplicó `ajustar_distribucion` una vez por cada una de las 5 categorías, con
 ## 6. Estado del archivo
 
 `srep.py` importa `ajustar_distribucion` desde `ajustes.py` y contiene: carga de `log_reparaciones_limpio.csv`, verificación inicial, decisión de agrupación (boxplot y Kruskal-Wallis en dos niveles más verificación de homogeneidad interna), y el ajuste final de las 5 categorías. Genera 6 boxplots, hasta 20 QQ-plots y 5 histogramas.
+
+# Parte VI — Caracterización de S^C_i (`sci.py`)
+
+*Análisis real de la variable de duración de sesión de cardio, usando `ajustar_distribucion` de `ajustes.py` sobre `cardio.csv`*
+
+## 1. Objetivo y alcance
+
+Este archivo contiene únicamente el análisis específico de S^C_i: decisión de agrupación, selección de candidatas, ajuste y test de bondad de ajuste. No contiene la función `ajustar_distribucion` en sí (vive en `ajustes.py` y se importa), ni el filtro que genera `cardio.csv` (resuelto en `filtros.py`, Parte III).
+
+## 2. Decisión de agrupación
+
+A diferencia de S^rep_f, aquí no hay múltiples máquinas que agrupar en categorías: `cardio.csv` registra una sola actividad (trotadora), y la única variable categórica disponible es `profile` (perfil del usuario: standard, express, flexible, intenso). Se comparó `duration_min` entre los 4 perfiles mediante boxplot y un test de Kruskal-Wallis, para decidir si la variable puede modelarse conjuntamente o requiere separarse en grupos.
+
+El test rechazó $H_0$ con margen amplio ($H=1241{,}84$; $p<0{,}001$), un estadístico bastante mayor al observado entre categorías de máquina en Srep ($H=246{,}03$), confirmando que la duración de la sesión de cardio difiere fuertemente entre perfiles.
+
+**Interpretación en el sistema.** El enunciado (Tabla 8) fija la permanencia máxima $T_k^{max}$ por perfil: Estándar 72 min, Express 50 min, Flexible 52 min, Intenso sin cota (tolerancia de espera infinita). El orden de las medias observadas replica exactamente ese orden: Express (8,92 min, la más baja y con la menor dispersión, $std=1{,}13$) < Flexible (16,05) < Estándar (17,69) < Intenso (26,81 min, la más alta y con la mayor dispersión, $std=9{,}34$). A menor presupuesto de tiempo total en el gimnasio, sesión de cardio más corta y menos variable, un resultado con sentido operacional y no solo estadístico.
+
+A diferencia de Srep, `profile` es la única variable categórica disponible en este archivo y ya es el nivel más fino de agrupación posible, por lo que no corresponde un segundo nivel de test (colapsar categorías). Sí se verificó si `routine` aportaba una diferencia adicional dentro de cada perfil, análogo a la verificación de homogeneidad interna hecha en Srep. Un Kruskal-Wallis por `routine` sobre el conjunto completo rechaza $H_0$ ($H=35{,}60$; $p<0{,}001$), pero al repetir el test dentro de cada perfil por separado, ninguno rechaza (Estándar $p=0{,}384$; Intenso $p=0{,}227$; Flexible $p=0{,}414$; Express $p=0{,}531$). El rechazo agregado es un efecto de confusión: los perfiles difieren entre sí en qué rutinas eligen con mayor frecuencia, y como también difieren en duración de cardio, eso genera una diferencia espuria por `routine` a nivel agregado que desaparece al controlar por perfil. Se confirma que `profile` es el único nivel de agrupación necesario para S^C_i.
+
+## 3. Selección de candidatas
+
+Mismo criterio de contexto usado en Srep: variable continua, positiva, sin cota superior natural, familias candidatas Exponencial, Gamma, Lognormal y Weibull, testeadas directamente con el test de bondad de ajuste en cada uno de los 4 perfiles, sin descartar la Exponencial de antemano por coeficiente de variación.
+
+## 4. Ajuste y resultados por perfil
+
+Se aplicó `ajustar_distribucion` una vez por cada uno de los 4 perfiles, con las 4 candidatas de contexto. La Exponencial fue rechazada en los 4 perfiles sin excepción.
+
+| Perfil | Distribución elegida | p-value | Estado |
+|---|---|---|---|
+| Intenso | weibull_min | 0,730 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Flexible | weibull_min | 0,794 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Express | weibull_min | 0,560 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Estándar | weibull_min | 0,1196 (KS) / ≈0 (simulado) | Mejor aproximación disponible; ninguna candidata pasa el test formal (ver limitación) |
+
+## 5. Limitaciones documentadas
+
+**Estándar: ninguna candidata ajusta formalmente.** Las 4 candidatas fueron rechazadas: la Exponencial de forma directa, Gamma y Lognormal por KS directo ($p=0{,}0367$ y $p=0{,}0461$ respectivamente), y Weibull cayó en zona ambigua ($p_{KS}=0{,}1196$) pero el bootstrap paramétrico confirmó el rechazo ($p$ simulado $\approx 0$). Se encontró que el 6,69% de las 1.210 observaciones de este perfil (81 filas) están exactamente en el valor máximo, 28,0 min, muy por encima de lo observado en los otros tres perfiles en su propio máximo (entre 0,13% y 0,33%, es decir, una sola observación cada uno, como se espera
+
+## 6. Estado del archivo
+
+`sci.py` importa `ajustar_distribucion` desde `ajustes.py` y contiene: carga de `cardio.csv`, verificación inicial, decisión de agrupación (boxplot y Kruskal-Wallis por `profile`), selección de candidatas, ajuste final de los 4 perfiles, la revisión de la acumulación en el máximo de Estándar, y la verificación de si `routine` aporta diferencia adicional dentro de cada perfil. Genera 1 boxplot comparativo, hasta 16 QQ-plots, 4 histogramas y 4 boxplots individuales (generados por `ajustar_distribucion`).
+
+
+

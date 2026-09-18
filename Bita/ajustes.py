@@ -1,8 +1,11 @@
+import os
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 
+CARPETA_FIGURAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Figuras ajustes')
+os.makedirs(CARPETA_FIGURAS, exist_ok=True)
 
 def p_value_simulado(datos, nombre_dist, parametros_originales, estadistico_observado, m=1000):
     """
@@ -65,7 +68,7 @@ def ajustar_distribucion(datos, nombre_grupo, candidatas):
     plt.title(f'Boxplot - {nombre_grupo}')
     plt.xlabel('Valor')
     plt.tight_layout()
-    plt.savefig(f'Figuras ajustes/boxplot_{nombre_grupo}.png')
+    plt.savefig(os.path.join(CARPETA_FIGURAS, f'boxplot_{nombre_grupo}.png'))
     plt.close()
 
     #Paso B: estimar parametros, testear bondad de ajuste (KS), simular p-value si es ambiguo, y generar QQ-plot
@@ -100,7 +103,7 @@ def ajustar_distribucion(datos, nombre_grupo, candidatas):
         plt.figure()
         stats.probplot(datos, dist=nombre_dist, sparams=parametros, plot=plt)
         plt.title(f'QQ-plot - {nombre_grupo} - {nombre_dist}')
-        plt.savefig(f'Figuras ajustes/qqplot_{nombre_grupo}_{nombre_dist}.png')
+        plt.savefig(os.path.join(CARPETA_FIGURAS, f'qqplot_{nombre_grupo}_{nombre_dist}.png'))
         plt.close()
 
     #Paso C: histograma con las densidades ajustadas de las candidatas superpuestas
@@ -116,7 +119,7 @@ def ajustar_distribucion(datos, nombre_grupo, candidatas):
     plt.xlabel('Valor')
     plt.ylabel('Densidad')
     plt.legend()
-    plt.savefig(f'Figuras ajustes/histograma_{nombre_grupo}.png')
+    plt.savefig(os.path.join(CARPETA_FIGURAS, f'histograma_{nombre_grupo}.png'))
     plt.close()
 
     tabla_resultados = pd.DataFrame(resultados_ajuste)
