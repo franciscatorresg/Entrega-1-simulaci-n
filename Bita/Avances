@@ -1,0 +1,422 @@
+# Documentación de limpieza de datos — Markov Fitness Club
+
+*ICS2133 — Fundamentals of Stochastic Systems Simulation · Entrega 1 · `log_operacional_historico.csv` y `log_reparaciones_historico.csv`*
+
+---
+
+# Parte I — Log operacional
+
+*Limpieza y depuración de `log_operacional_historico.csv` (115.844 filas, 23 columnas)*
+
+## 1. Objetivo y alcance
+
+Este documento describe el proceso de limpieza aplicado a `log_operacional_historico.csv`, correspondiente a la etapa compartida de preparación de datos que utilizan las cuatro variables de la Parte 1 (R_i, S^F_ij, S^C_i, S^rep) y la Parte 2 (proceso de llegada). La limpieza se implementó en un único script de Python, ejecutado una sola vez, de manera que las tres integrantes trabajan sobre el mismo dataframe depurado (info limpia).
+
+Todas las decisiones de este documento se tomaron respetando dos reglas del enunciado: los campos vacíos no se interpretan como cero (pueden corresponder a "no aplica" para ese tipo de evento), y `day_id` de este archivo no se cruza con `historical_day` del log de reparaciones, son independientes.
+
+## 2. Carga del archivo
+
+El archivo se cargó especificando el separador (`;`), la codificación (`utf-8-sig`, para eliminar el BOM inicial) y `low_memory=False`, necesario porque pandas detectaba tipos mixtos en la columna `origin` al leer el archivo por bloques.
+
+## 3. Formato general de las columnas numéricas
+
+Las nueve columnas numéricas (`event_time`, `planned_order`, `speed_m_per_min`, `duration_min`, `wait_min`, `water_liters`, `towel_count`, `stock_after`, `dissatisfaction`) llegan como texto con coma decimal (por ejemplo, "5,429"). Se reemplazó la coma por un punto y se convirtió cada columna a tipo numérico, preservando los valores vacíos como `NaN` en vez de forzarlos a cero.
+
+Se verificó adicionalmente que `event_time`, `duration_min` y `wait_min` no contuvieran valores negativos (no se encontró ninguno). Se detectó una única fila con `duration_min = 0`, correspondiente a un evento `worker_travel` con `outcome = "interrupted"` (un desplazamiento de personal interrumpido apenas iniciado). Esta fila es válida y entonces no requiere corrección, y de cualquier forma no pertenece a ninguna de las categorías de evento que usan las variables de esta entrega.
+
+## 4. Categorías inválidas en `event_type` y `outcome`
+
+Se identificaron dos valores que no existen en el diccionario de datos.
+
+**`event_type = "evento_mal_escrito"` (41 filas).** El valor no corresponde a ningún tipo de evento documentado. Sin embargo, el resto de las columnas de cada fila permite identificar de forma inequívoca a qué evento real corresponde, según el siguiente patrón:
+
+- `resource` en {`towels`, `water`} y `outcome = "completed"` → `supply_pickup` (26 filas)
+- `resource` en {`towels`, `water`} y `outcome = "empty"` → `stockout` (1 fila)
+- `resource` en {`trainers`, `receptionists`, `technicians`} → `worker_travel` (12 filas)
+- `outcome = "arrived"` → `assistance` (2 filas)
+
+Las 41 filas se reclasificaron aplicando estas reglas. La verificación posterior mostró que los conteos de `supply_pickup`, `stockout`, `worker_travel` y `assistance` aumentaron exactamente en 26, 1, 12 y 2 respectivamente, confirmando que la reclasificación no generó pérdidas ni duplicaciones.
+
+**`outcome = "resultado_desconocido"` (40 filas).** De la misma manera, el `event_type` de cada fila permite inferir su resultado real:
+
+- `event_type = "supply_pickup"` → `completed` (28 filas)
+- `event_type = "assistance"` → `arrived` (7 filas)
+- `event_type = "worker_travel"` → `completed` (2 filas)
+- `event_type = "stockout"` → `empty` (3 filas)
+
+Tras la reclasificación, `resultado_desconocido` desaparece de la columna y los conteos de las categorías correspondientes aumentan en las cantidades esperadas (30, 7 y 3).
+
+## 5. Valor centinela en `water_liters`
+
+Se encontraron 40 filas con `water_liters = 1.000.000`, un valor sin sentido físico (equivalente a un millón de litros por retiro individual de agua). El valor aparece incluso en tipos de evento donde la columna no debería tener datos (`assistance`, `worker_travel`), lo que confirma que se trata de un valor centinela de error, no de una medición real. Estas 40 filas se convirtieron a `NaN`. Tras la corrección, el máximo de `water_liters` quedó en 1,5 litros y el promedio en 0,40 litros, valores coherentes con un retiro individual.
+
+Se verificó adicionalmente que `towel_count` (fijo en 2,0) y `stock_after` (máximo 100,0) no presentan el mismo problema.
+
+## 6. Código fuera de rango en `destination`
+
+Se encontraron 41 filas con `destination = 99`, código inexistente en la grilla del recinto (celdas válidas: 1 a 49), concentradas en `supply_pickup` (25 filas), `worker_travel` (11 filas) y `assistance` (5 filas). El código nunca aparece en `origin`. Dado que solo entre un 0,1% y un 0,2% de las filas de cada uno de esos tipos de evento presenta este valor, se descartó la hipótesis de que fuera un código de negocio válido (por ejemplo, "regresa a su actividad anterior"), y se trató como un valor de error. Las 41 filas se convirtieron a `NaN` en `destination`.
+
+## 7. Coordenadas en metros en `origin` / `destination`
+
+Se encontraron 25 filas donde `origin` o `destination` vienen expresados como una coordenada en metros (por ejemplo, `(5.356,16.250)`) en vez del número de celda que usa el resto del dataset. 24 de estas filas corresponden a `event_type = "exercise"` y 1 a `worker_travel`.
+
+A partir de la tabla de celdas del enunciado (celdas de 2,5 m de lado, grilla de 7×7) y de la numeración de celdas de la figura del recinto, se derivó una fórmula de conversión de coordenada a número de celda. Esta fórmula se aplicó a las 25 filas y se comparó el resultado contra la ubicación real de cada máquina, según la hoja "Recursos" del diccionario de datos. El resultado: en 24 de las 25 filas, la celda calculada no corresponde a ninguna celda real de la máquina indicada en `resource`. La única coincidencia (`chest_press` → celda 47) es explicable por azar, dado que esa máquina solo tiene 2 celdas posibles. Se concluyó que estas coordenadas son valores corruptos, no información recuperable, y las 25 filas se convirtieron a `NaN` en la columna correspondiente.
+
+## 8. Verificaciones sin hallazgos
+
+Se realizaron cuatro verificaciones adicionales que no requirieron ninguna corrección:
+
+- Las columnas booleanas `assistance`, `cardio_planned` y `cable_planned` solo toman los valores `True`, `False` o vacío.
+- `profile` está vacío en 6.488 filas (5.768 `worker_travel`, 515 `replenishment`, 205 `repair`), consistente con actividades de personal sin usuario asociado.
+- `routine` solo toma las cinco categorías esperadas (`full_body`, `pull`, `legs`, `push`, `upper`), sin vacíos inesperados en `visit` ni `exercise`.
+- No se encontraron filas duplicadas exactas ni valores de `event_id` repetidos dentro de un mismo `day_id`.
+
+## 9. Eventos posteriores al cierre operacional (900 minutos)
+
+Se revisaron los eventos con `event_time > 900` (22:00, hora de cierre): 289 `worker_travel`, 10 `exercise` y 1 `repair`. Los 289 desplazamientos de personal y la reparación son coherentes con el enunciado, que permite al personal permanecer y a las reparaciones en curso terminar después del cierre. Los 10 ejercicios, en cambio, corresponden todos a `outcome = "pending"` con `duration_min` vacío: son intentos que quedaron pendientes por el cierre y nunca se ejecutaron, no ejercicios que se hayan realizado fuera de horario. No se requiere ninguna corrección, dado que estas filas quedan excluidas de forma natural por el filtro `outcome == "completed"` que se aplica al construir la variable de fuerza.
+
+## 10. Casos pendientes, específicos de la variable de fuerza (S^F_ij)
+
+Se identificaron dos casos adicionales, ambos exclusivos de `event_type = "exercise"` y por lo tanto sin efecto sobre cardio, rutina, reparación o el proceso de llegada.
+
+**4 filas con `outcome = "completed"` y `duration_min` vacío** (0,009% de los ejercicios completados). Se revisaron las columnas restantes de estas filas sin encontrar información que permita reconstruir la duración. Se recomienda descartar estas 4 filas al construir el conjunto de datos de S^F_ij.
+
+**3 filas con `outcome` distinto de `completed`** (`pending`, `omitted`, `retry_failed`) **y `duration_min = 1,0` exacto.** El valor idéntico entre outcomes distintos sugiere un valor de relleno, no una duración real. No requiere ninguna acción de limpieza adicional, dado que estas filas ya quedan excluidas por el filtro `outcome == "completed"` usado para definir la variable.
+
+## 11. Segunda revisión (verificación cruzada) y correcciones adicionales
+
+Con el archivo ya limpio según las secciones anteriores, una integrante del grupo realizó una revisión cruzada independiente sobre `log_operacional_limpio.csv`, detectando 7 patrones adicionales para verificar. De los 7, 5 correspondían a correcciones nuevas, 1 resultó ya cubierto por una corrección previa de este mismo documento (sección 6) sin que se detectara en su momento, y 1 no requiere corrección por tratarse de un dato genuinamente faltante. A continuación se documenta cada uno.
+
+### 11.1 Campo `profile` en `worker_travel`
+
+Se encontraron 5 filas con `event_type = "worker_travel"` y `profile` informado (valor "standard"), cuando el diccionario de datos indica que ese campo solo se completa en actividades de usuario. Las 5 filas correspondían a desplazamientos de personal (`worker_id` presente, `user_id` vacío), consistente con un arrastre incorrecto de datos. Se estableció `profile = NaN` en las 5 filas.
+
+### 11.2 `destination` faltante en `assistance`
+
+Se encontraron 6 filas de `assistance` sin `destination`. Se verificó que, a diferencia de `worker_travel` (donde el destino de un trabajador varía según el viaje), cada unidad de máquina en `resource` (por ejemplo, `chest_press-01`) tiene una única celda asociada de forma consistente en el resto de las observaciones, igual que en `log_reparaciones_historico.csv`. Se completaron las 6 filas usando esa correspondencia fija entre unidad y celda.
+
+### 11.3 `duration_min` residual en `assistance`
+
+Según el diccionario, el campo relevante para `assistance` es `wait_min` (espera hasta la llegada de un entrenador), no `duration_min`. Se encontró 1 sola fila de 4.182 con `duration_min` informado, sin ningún patrón que lo explique. Se trató como un residuo aislado y se estableció en `NaN`.
+
+### 11.4 `destination` faltante en `registration`
+
+Se encontraron 6 filas de `registration` sin `destination`, mientras que el 100% de las 14.398 filas restantes de este tipo de evento tiene `destination = 7` (recepción), sin excepción. Se completaron las 6 filas con ese valor fijo.
+
+### 11.5 `destination` faltante en `supply_pickup`
+
+Se encontraron 45 filas de `supply_pickup` completadas sin `destination`. Se verificó que `resource = "towels"` siempre corresponde a `destination = 44` y `resource = "water"` siempre a `destination = 48`, sin excepciones en el resto del archivo. Se completaron las 45 filas (33 de toallas y 12 de agua) por ese criterio.
+
+### 11.6 Evento mal clasificado (`supply_pickup` con `outcome = "empty"`)
+
+Se encontró 1 fila con `event_type = "supply_pickup"` y `outcome = "empty"`, cuando este tipo de evento solo debería tener `outcome = "completed"` según el diccionario. Al revisar el detalle de la fila, `towel_count` aparece vacío (no 2,0, como en un retiro normal) y `stock_after = 0,0`, un patrón que corresponde a un evento `stockout` (insumo agotado), no a una recolección completada. El error estaba en `event_type`, no en `outcome`. Se reclasificó la fila a `event_type = "stockout"`.
+
+### 11.7 `destination` faltante en `worker_travel` (caso ya cubierto)
+
+De 12 filas de `worker_travel` señaladas en la revisión con `destination` vacío, se verificó el valor original de cada una antes de cualquier limpieza: 11 correspondían al sentinela `destination = "99"` ya corregido en la sección 6 de este documento, y solo 1 fila tenía el campo genuinamente vacío desde el archivo original. No fue necesaria ninguna corrección adicional: las 11 ya estaban resueltas, y la fila restante queda como dato faltante legítimo (ver nota siguiente).
+
+### 11.8 Datos faltantes sin corrección posible
+
+Se documentan dos situaciones donde no existe evidencia contextual suficiente para completar el dato sin inventarlo, por lo que se dejan como `NaN`:
+
+- 1 fila de `worker_travel` (día D040, recepcionista) sin `destination`. A diferencia de `registration` y `supply_pickup`, el destino de un desplazamiento de `trainers` o `receptionists` varía ampliamente (recepción, toallas, agua, entrada), sin un valor dominante que permita imputarlo con confianza.
+- 2 visitas con `outcome = "completed"` sin `duration_min`, `wait_min` ni `dissatisfaction` (día D015, usuario U-0264; día D021, usuario U-0094). Ambas son el único evento registrado ese día para ese usuario, sin otras filas relacionadas de las que cruzar información.
+
+### 11.9 Nota metodológica: tipo de dato de `origin` y `destination`
+
+Al completar los casos anteriores se aprovechó de convertir `origin` y `destination` de texto a tipo numérico entero con soporte de nulos (`Int64`), en vez de dejarlas como texto. Ambas columnas representan celdas de la grilla del recinto (valores de 1 a 49), por lo que el tipo numérico es más adecuado para cálculos posteriores (distancias, filtros por rango) y es consistente con el resto de las columnas numéricas ya convertidas en la sección 3.
+
+## 12. Resumen de decisiones
+
+Vista consolidada de todos los hallazgos y correcciones aplicadas a este archivo, incluyendo la revisión cruzada de la sección 11.
+
+| Hallazgo | Filas afectadas | Acción |
+|---|---|---|
+| Formato de coma decimal | 9 columnas, todo el archivo | Conversión a formato numérico estándar |
+| `event_type = "evento_mal_escrito"` | 41 | Reclasificación al evento real |
+| `outcome = "resultado_desconocido"` | 40 | Reclasificación al outcome real |
+| `water_liters = 1.000.000` | 40 | Conversión a NaN |
+| `destination = 99` | 41 | Conversión a NaN |
+| Coordenadas en metros en origin/destination | 25 | Conversión a NaN |
+| Eventos tras el cierre (900 min) | 300 | Sin acción, comportamiento esperado |
+| `duration_min` vacío en ejercicios completados | 4 | Pendiente: descartar al construir S^F_ij |
+| `duration_min = 1,0` placeholder | 3 | Sin acción, excluidas por filtro existente |
+| `profile` informado en `worker_travel` | 5 | Conversión a NaN |
+| `destination` faltante en `assistance` | 6 | Completado por celda fija del resource |
+| `duration_min` residual en `assistance` | 1 | Conversión a NaN |
+| `destination` faltante en `registration` | 6 | Completado con valor fijo (7) |
+| `destination` faltante en `supply_pickup` | 45 | Completado por resource (towels→44, water→48) |
+| `supply_pickup` con `outcome = "empty"` | 1 | Reclasificado a `event_type = "stockout"` |
+| `destination` faltante en `worker_travel` | 1 | Sin acción, dato faltante genuino |
+| Visitas completed sin datos de resumen | 2 | Sin acción, dato faltante genuino |
+
+---
+
+# Parte II — Log de reparaciones
+
+*Limpieza y depuración de `log_reparaciones_historico.csv` (1.307 filas, 7 columnas)*
+
+## 1. Estado inicial y alcance
+
+Este documento describe el proceso de limpieza aplicado a `log_reparaciones_historico.csv`, que registra las reparaciones observadas de las máquinas del gimnasio y se usa para caracterizar la frecuencia y duración de las reparaciones (variable S^rep). El archivo llegó en mejor estado que el log operacional: sin valores nulos, sin filas duplicadas (ni por `repair_id` ni en su totalidad), y con formato de columnas consistente salvo por el mismo problema de coma decimal detectado en el archivo operacional.
+
+## 2. Formato de columnas numéricas
+
+Las columnas `failure_time` y `repair_duration_min` llegaron como texto con coma decimal (por ejemplo, "23,857"). Se reemplazó la coma por un punto y se convirtieron ambas a tipo numérico. El rango resultante de `failure_time` (14,904 a 910,646 minutos) es coherente con la duración de un día simulado, y sirvió como referencia para descartar errores de rango en el resto de las verificaciones.
+
+## 3. Categoría inválida en `machine_type`
+
+La fila `REP-00169` tenía `machine_type = "registro_erroneo"`, un valor que no existe en el diccionario de datos. Se verificó que su `unit_id` (`lat_pulldown-02`) y su `cell` (22) coincidían exactamente con las demás filas de esa unidad, por lo que se reclasificó a `machine_type = "lat_pulldown"` usando el `unit_id` como evidencia contextual.
+
+## 4. Valor sentinela en `cell`
+
+La fila `REP-01221`, correspondiente a `unit_id = shoulder_press-01`, tenía `cell = 99`, mientras que todas las demás observaciones de esa unidad registraban `cell = 49`. El mismo patrón de sentinela fuera de rango que se detectó en `destination` del log operacional. Se corrigió a 49 por el mismo criterio de consistencia por `unit_id`.
+
+## 5. Duraciones negativas en `repair_duration_min`
+
+Se detectaron 2 filas (`REP-00813` y `REP-00872`) con `repair_duration_min` negativo (-31,622 y -16,152). El resto de los campos de ambas filas era consistente y válido (`unit_id`, `cell` y `machine_type` calzaban entre sí sin problema), por lo que se interpretó como un error de signo en la captura del dato, no como una observación inválida. Se corrigió tomando el valor absoluto en ambas filas, en vez de descartar la observación o convertirla a NaN.
+
+## 6. Nota metodológica: alcance temporal del archivo
+
+`historical_day` cubre un rango de 240 días (H001 a H240, con 3 días sin reparaciones registradas: H030, H060 y H186), mientras que `day_id` del log operacional solo cubre 40 días (D001 a D040). Son dos escalas temporales distintas y no deben cruzarse directamente entre archivos; este log parece pensado para caracterizar la distribución de fallas y duraciones de reparación con una muestra más amplia que la del período operacional simulado.
+
+## 7. Estado final
+
+- 1.307 filas, sin valores nulos, sin duplicados.
+- 11 categorías válidas en `machine_type` (se eliminó la categoría inválida "registro_erroneo").
+- `failure_time` en rango [14,904 ; 910,646].
+- `repair_duration_min` en rango [6,121 ; 58,559], sin valores negativos.
+- Cada `unit_id` asociado a un único valor de `cell`.
+- Exportado como `log_reparaciones_limpio.csv`.
+
+---
+
+# Parte III — Filtrado de variables (Entrega 1, Parte 1)
+
+*Generación de los cuatro subconjuntos filtrados a partir de `log_operacional_limpio.csv` y `log_reparaciones_limpio.csv`, implementada en `filtros.py`*
+
+## 1. Objetivo y alcance
+
+Este documento describe la construcción de los cuatro conjuntos de datos filtrados que corresponden a las variables de la Parte 1 del enunciado: tipo de rutina (R_i), duración de fuerza (S^F_ij), duración de cardio (S^C_i) y tiempo de reparación (S^rep_f). Los dos archivos limpios se cargan una sola vez al inicio del script y sirven de base para los cuatro filtros.
+
+## 2. R_i — Tipo de rutina seleccionada
+
+Se filtraron las filas con `event_type == "visit"`, que garantiza una única observación por visita (a diferencia de `routine`, que también aparece repetida en cada fila `exercise` de esa visita). Se verificaron los valores de `routine` dentro de estas filas: las 5 categorías esperadas (`upper`, `pull`, `legs`, `push`, `full_body`), sin valores nulos, sumando exactamente las 15.431 visitas del archivo.
+
+Se identificó `day_id` + `user_id` como identificador único de cada visita (verificado: 0 duplicados en esa combinación; `user_id` solo no sirve porque los mismos 425 usuarios se repiten en distintos días).
+
+**Columnas exportadas:** `day_id`, `user_id`, `profile`, `routine`. Se excluyeron el resto de las 23 columnas del log por no aplicar a este tipo de evento (100% vacías en filas `visit`, por ejemplo `worker_id`, `water_liters`, `assistance`).
+
+**Resultado:** 15.431 filas, exportado como `rutina.csv`.
+
+## 3. S^F_ij — Duración efectiva de los ejercicios de fuerza completados
+
+Se filtraron las filas con `event_type == "exercise"`. Al revisar los valores de `outcome` dentro de estas filas se encontró que `completed_failed` (188 filas) tiene `duration_min` completo (0 nulos, promedio 8,05 min, similar a los 8,34 min de `completed`), consistente con el enunciado (la falla de una máquina se evalúa solo después de finalizar un uso efectivo). Se decidió incluir `completed_failed` junto con `completed` en el filtro, a diferencia de `omitted`, `pending` y `retry_failed`, que están casi enteramente vacíos en `duration_min` y corresponden a ejercicios no realizados.
+
+Dentro de las filas con `outcome == "completed"` se encontraron 4 filas con `duration_min` vacío (documentado en la sección 10 de la Parte I de este archivo), sin información recuperable en el resto de las columnas. Estas 4 filas se descartaron del filtro.
+
+**Columnas exportadas:** `day_id`, `user_id`, `event_id`, `resource`, `routine`, `assistance`, `outcome`, `duration_min`, `profile`.
+- Se incluyó `event_id` porque `day_id` + `user_id` identifica la visita, no el ejercicio individual (una visita tiene varios ejercicios).
+- Se incluyó `outcome` para mantener trazabilidad de qué filas son `completed` y cuáles `completed_failed`.
+- Se incluyeron `routine` y `assistance` por ser candidatas a variable de agrupación (pobladas y con variación dentro de este subconjunto).
+- Se excluyó `wait_min` por corresponder a un fenómeno distinto (espera antes del ejercicio, no la duración en sí).
+- Se excluyeron `event_time`, `planned_order`, `origin`, `destination`, `water_liters`, `stock_after` por describir logística/consumo de la visita, no la variable en sí. Se excluyeron `worker_id`, `cardio_planned`, `cable_planned`, `speed_m_per_min`, `towel_count`, `dissatisfaction` por no aplicar estructuralmente a este tipo de evento (100% vacías).
+
+**Resultado:** 46.612 filas (46.424 `completed` + 188 `completed_failed`), exportado como `fuerza.csv`.
+
+## 4. S^C_i — Duración efectiva de las sesiones de cardio realizadas
+
+Se filtraron las filas con `event_type == "cardio"`. Se encontró el mismo patrón que en fuerza: `completed_failed` (17 filas) tiene `duration_min` completo (0 nulos, promedio 17,50 min, similar a los 18,56 min de `completed`), mientras que `not_completed` (1.435 filas) está casi enteramente vacío. Se incluyeron `completed` y `completed_failed`, sin quedar filas con `duration_min` nulo dentro de ese subconjunto.
+
+Se verificó adicionalmente la relación entre `cardio_planned` a nivel de visita y la ocurrencia real de un evento `cardio`: de 4.787 visitas con `cardio_planned == True`, solo 4.463 generaron una fila `event_type == "cardio"` (las 324 restantes planearon cardio pero nunca lo intentaron, sin duración que medir). Estas 324 visitas no corresponden a S^C_i por no tener una sesión realizada, y no se incluyeron en el filtro.
+
+A diferencia de fuerza, `resource` (siempre `"treadmill"`), `cardio_planned` (siempre `True`) y `assistance` (100% vacío en este tipo de evento) no aportan como variables de agrupación dentro de este subconjunto, por lo que se excluyeron. `speed_m_per_min` también está vacío en `cardio`; corresponde a `worker_travel`, no a las sesiones de cardio.
+
+**Columnas exportadas:** `day_id`, `user_id`, `event_id`, `routine`, `profile`, `outcome`, `duration_min`.
+
+**Resultado:** 3.028 filas (3.011 `completed` + 17 `completed_failed`), exportado como `cardio.csv`.
+
+## 5. S^rep_f — Tiempo de reparación de las máquinas
+
+A diferencia de las tres variables anteriores, esta no requiere filtrar filas ni columnas: `log_reparaciones_limpio.csv` es un archivo dedicado exclusivamente a reparaciones (1.307 filas, sin nulos, sin duplicados), donde cada fila ya corresponde a una observación válida de S^rep_f. Se decidió no generar un archivo adicional, ya que exportar las 7 columnas sin ninguna transformación sería una copia idéntica del archivo ya limpio y ya generado.
+
+**Resultado:** se usa directamente `log_reparaciones_limpio.csv` (1.307 filas) para caracterizar S^rep_f, sin archivo adicional.
+
+## 6. Resumen de archivos generados
+
+| Variable | Filtro aplicado | Filas | Archivo |
+|---|---|---|---|
+| R_i | `event_type == "visit"` | 15.431 | `rutina.csv` |
+| S^F_ij | `event_type == "exercise"`, `outcome` en {completed, completed_failed}, `duration_min` no nulo | 46.612 | `fuerza.csv` |
+| S^C_i | `event_type == "cardio"`, `outcome` en {completed, completed_failed} | 3.028 | `cardio.csv` |
+| S^rep_f | sin filtro adicional | 1.307 | `log_reparaciones_limpio.csv` |
+
+---
+
+# Parte IV — Módulo de ajuste y test de distribuciones (`ajustes.py`)
+
+*Código genérico y reutilizable para caracterizar las tres variables continuas de la Parte 1 (S^F_ij, S^C_i, S^rep), a usar por las tres integrantes*
+
+## 1. Objetivo y alcance
+
+Este módulo no está atado a ninguna variable en particular: recibe un vector de datos ya filtrado (por ejemplo, las duraciones de un grupo específico dentro de fuerza, cardio o reparación) y devuelve el análisis exploratorio y el ajuste de distribuciones que pide la pregunta 1 del enunciado (secciones a, b y c). Quien decide qué filtrar, cómo agrupar, y qué candidatas probar es cada integrante con su propia variable; el módulo solo ejecuta el procedimiento una vez que esas decisiones ya se tomaron.
+
+`R_i` (tipo de rutina) no usa este módulo, por ser categórica: se trata aparte con proporciones y un test de homogeneidad (chi-cuadrado), no con ajuste de distribuciones continuas.
+
+## 2. Función `ajustar_distribucion(datos, nombre_grupo, candidatas)`
+
+**Entrada:**
+- `datos`: vector de valores numéricos (por ejemplo, `df['duration_min']` de un grupo ya filtrado).
+- `nombre_grupo`: string para identificar el grupo en la tabla de resultados y en los nombres de los gráficos (por ejemplo, `"fuerza_empuje"`).
+- `candidatas`: lista de nombres de distribuciones de `scipy.stats` a probar (por ejemplo, `['gamma', 'lognorm', 'weibull_min']`). No vienen fijas dentro de la función, cada integrante decide cuáles probar según su propia variable.
+
+**Qué hace, paso a paso:**
+
+1. **Descriptivas ampliadas.** `count`, `mean`, `std`, cuartiles y máximo/mínimo (`.describe()`), más asimetría (`skewness`) y curtosis, que no vienen incluidas en `.describe()` pero las pide explícitamente la pregunta 1a del enunciado (forma, asimetría, colas).
+2. **Boxplot** y **conteo de atípicos** por la regla del rango intercuartílico ($[Q_1 - 1{,}5 \cdot IQR,\ Q_3 + 1{,}5 \cdot IQR]$), también pedido en 1a.
+3. **Estimación de parámetros** por máxima verosimilitud (`.fit()`) para cada candidata de la lista.
+4. **Test de bondad de ajuste Kolmogorov-Smirnov** (`stats.kstest`) con los parámetros ya estimados, reportando estadístico, p-value y conclusión con α = 0,05.
+5. **Corrección de p-value en zona ambigua.** Si el p-value del KS cae entre 0,05 y 0,2, se dispara automáticamente un p-value simulado vía bootstrap paramétrico (ver sección 3). La conclusión final usa el p-value simulado cuando existe, si no, el del KS directo.
+6. **QQ-plot** por cada candidata (`stats.probplot`), guardado como imagen.
+7. **Histograma único** con las densidades de todas las candidatas superpuestas sobre las mismas barras, guardado como imagen.
+
+**Salida:** un `DataFrame` con una fila por candidata y las columnas `grupo`, `distribucion`, `parametros`, `estadistico`, `p_value`, `p_value_simulado`, `conclusion`. Esta tabla es el formato acordado para reportar resultados en el informe.
+
+## 3. Corrección del p-value en zona ambigua (`p_value_simulado`)
+
+Al aplicar `stats.kstest` con parámetros estimados de los mismos datos (en vez de parámetros conocidos de antemano), el p-value que entrega **sobreestima** el valor real, lo que hace que se rechace $H_0$ menos de lo que correspondería. Esto está documentado explícitamente en el material del curso (Capítulo 3, Análisis de Input), que da como regla: si el p-value cae entre 0,05 y 0,2, no se puede interpretar directamente, hay que simular el p-value real.
+
+**Procedimiento implementado** (bootstrap paramétrico, según el capítulo):
+1. Generar una muestra $Y_1, ..., Y_n$ desde la distribución candidata usando los parámetros ya estimados de los datos originales.
+2. Reestimar los parámetros de esa misma distribución usando la muestra simulada.
+3. Calcular el estadístico KS de la muestra simulada contra su propia distribución reestimada.
+4. Repetir 1.000 veces y contar en cuántas el estadístico simulado fue igual o mayor al observado con los datos reales. Esa proporción es el p-value simulado.
+
+Este procedimiento no es específico de ninguna distribución, aplica a cualquier candidata cuyo p-value del KS caiga en esa zona, sin importar la variable.
+
+## 4. Prueba de validación (no es el análisis final de ninguna variable)
+
+`ajustes.py` se probó de punta a punta usando `repair_duration_min` completo (sin separar por grupo), solo para confirmar que el código corre correctamente con datos reales antes de dárselo a las demás integrantes:
+
+- Asimetría: 0,662; curtosis: -0,269; 2 atípicos de 1.307 (0,15%) por regla IQR.
+- Con `gamma`, `lognorm` y `weibull_min`: `weibull_min` dio un p-value KS de 0,090 (zona ambigua), y el p-value simulado resultó 0,0, revirtiendo la conclusión de "no se rechaza" a "se rechaza $H_0$".
+- El histograma y el QQ-plot muestran una cola derecha (35-50 min) que ninguna de las tres candidatas captura bien, consistente con la posible necesidad de separar reparación por `machine_type` (pendiente de decidir en el análisis real, tarea 3).
+
+Esta prueba **no es la caracterización final de S^rep**, solo validó que la función funciona. El análisis real de reparación y cardio queda pendiente, en archivos separados que importen este módulo.
+
+## 5. Cómo elegir las distribuciones candidatas a pasar como parámetro
+
+Documentado según el método del Capítulo 3 del curso, con tres técnicas complementarias:
+
+1. **Por contexto**: origen y soporte de los datos. Para variables de duración (fuerza, cardio, reparación): continuas, positivas, sin límite superior natural, las familias típicas son Exponencial, Gamma, Lognormal y Weibull.
+2. **Por métricas propias de cada familia**: por ejemplo, la Exponencial tiene coeficiente de variación ($CV = \sigma / \mu$) igual a 1 por definición. Si el CV de los datos reales se aleja mucho de 1, se descarta la Exponencial sin necesidad de test. Para reparación: $CV = 11{,}068 / 25{,}058 \approx 0{,}44$, lejos de 1, por lo que se descartó la Exponencial y se mantuvieron Gamma, Lognormal y Weibull.
+3. **Por visualización**: el histograma (ya generado por la función) para confirmar la forma a ojo.
+
+Si ninguna candidata ajusta bien tras aplicar esto, el capítulo indica evaluar si la muestra debe dividirse en grupos, con evidencia visual y un test como Kruskal-Wallis, antes de volver a ajustar por separado.
+
+## 6. Estado del archivo
+`ajustes.py` contiene únicamente las dos funciones (`p_value_simulado` y `ajustar_distribucion`), sin código ejecutable ni datos de ninguna variable específica. Al final del archivo queda, comentado con `#`, un ejemplo de uso con reparación, solo como referencia de sintaxis para quien lo importe, sin que se ejecute nunca. Persona 1 y Persona 3 pueden importarlo con `from ajustes import ajustar_distribucion`.
+
+# Parte V — Caracterización de S^rep (`srep.py`)
+
+*Análisis real de la variable de tiempo de reparación, usando `ajustar_distribucion` de `ajustes.py` sobre `log_reparaciones_limpio.csv`*
+
+## 1. Objetivo y alcance
+
+Este archivo contiene únicamente el análisis específico de S^rep: decisión de agrupación, selección de candidatas, ajuste y test de bondad de ajuste. No contiene la función `ajustar_distribucion` en sí (vive en `ajustes.py` y se importa), ni el filtro que genera `log_reparaciones_limpio.csv` (resuelto en la limpieza del log de reparaciones, Parte II).
+
+## 2. Decisión de agrupación
+
+**Nivel 1: ¿se puede modelar S^rep conjuntamente?** Se comparó `repair_duration_min` entre las 11 categorías de `machine_type` mediante boxplot y un test de Kruskal-Wallis. El test rechazó $H_0$ con margen amplio ($H=248{,}59$; $p<0{,}001$), confirmando que el tiempo de reparación no es homogéneo entre tipos de máquina y que la variable requiere separarse en grupos.
+
+**Nivel 2: elección del nivel de agrupación.** En vez de definir grupos a partir de la inspección visual del boxplot, se usó la columna `Categoría` del diccionario de datos (`diccionario_logs.xlsx`, hoja "Recursos"), que clasifica las 11 máquinas en 5 categorías funcionales: Cardio, Empuje, Jalón, Piernas y Multifuncional. Este criterio es consistente con el que usa Persona 1 para S^F_ij, evitando que el informe use dos lógicas de agrupación distintas para máquinas de gimnasio.
+
+| Categoría | Máquinas | N |
+|---|---|---|
+| Empuje | chest_press, shoulder_press, chest_fly | 388 |
+| Jalón | lat_pulldown, seated_row, biceps_curl | 362 |
+| Piernas | leg_press, leg_curl, leg_extension | 347 |
+| Multifuncional | cable | 117 |
+| Cardio | treadmill | 93 |
+
+Un Kruskal-Wallis a nivel de estas 5 categorías también rechazó $H_0$ ($H=246{,}03$; $p<0{,}001$), con un estadístico casi idéntico al de las 11 máquinas, confirmando que la categoría captura prácticamente toda la diferencia relevante.
+
+**Verificación de homogeneidad interna.** Para confirmar que agrupar por categoría no mezcla máquinas realmente distintas entre sí, se corrió un Kruskal-Wallis adicional dentro de cada categoría con más de una máquina (Empuje, Jalón, Piernas; Cardio y Multifuncional tienen una sola máquina cada una y no requieren este chequeo). Ninguno rechazó $H_0$:
+
+| Categoría | H | p-value |
+|---|---|---|
+| Empuje | 0,2029 | 0,9035 |
+| Jalón | 1,0230 | 0,5996 |
+| Piernas | 1,3461 | 0,5101 |
+
+Con esto queda justificado el nivel de agrupación: hay diferencia real entre categorías, y no hay diferencia significativa dentro de cada una.
+
+## 3. Selección de candidatas
+
+Se aplicó el criterio de contexto documentado en la Parte IV: variable continua, positiva, sin cota superior natural, familias candidatas Exponencial, Gamma, Lognormal y Weibull. A diferencia de la prueba de validación (Parte IV, sección 4), no se aplicó el filtro de coeficiente de variación para descartar la Exponencial de antemano; se decidió testear las 4 candidatas directamente con el test de bondad de ajuste en cada una de las 5 categorías, dejando que el test (evidencia directa, con p-value) decida en vez de una heurística previa (evidencia indirecta).
+
+## 4. Ajuste y resultados por categoría
+
+Se aplicó `ajustar_distribucion` una vez por cada una de las 5 categorías, con las 4 candidatas de contexto. La Exponencial fue rechazada en las 5 categorías sin excepción, consistente con el CV observado en la prueba de validación inicial.
+
+| Categoría | Distribución elegida | p-value | Estado |
+|---|---|---|---|
+| Piernas | weibull_min | 0,5080 | Ajuste válido (única no rechazada; gamma y lognorm cayeron en zona ambigua y fueron rechazadas tras bootstrap) |
+| Jalón | lognorm | 0,9956 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Multifuncional | lognorm | 0,7418 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Empuje | lognorm | 0,0675 | Mejor aproximación disponible; ninguna candidata pasa el test formal (ver limitación) |
+| Cardio | lognorm | 0,4634 | Mejor aproximación disponible entre 3 empatadas (ver limitación) |
+
+## 5. Limitaciones documentadas
+
+**Empuje: ninguna candidata ajusta formalmente.** Las 4 candidatas fueron rechazadas, incluso lognorm tras la corrección por bootstrap (p-value simulado = 0,0). El histograma muestra un pico entre 10-20 min y un bulto secundario entre 30-40 min que ninguna familia unimodal captura. Se verificó si este patrón se explicaba por `unit_id` (unidad física), `failure_time` (hora de la falla) o `cell` (ubicación), separando las observaciones en dos grupos según el bulto (≤25 min vs. >25 min): ninguna de las tres variables mostró diferencia entre esos grupos, y el mismo patrón de doble bulto aparece de forma consistente en las 3 máquinas de Empuje por separado, no solo al agruparlas. Se concluye que es variabilidad real del proceso de reparación no explicada por las columnas disponibles, y se reporta lognorm como la mejor aproximación empírica, dejando explícito que no está validada estadísticamente.
+
+**Cardio: posible censura no documentada en 50 min.** Las 3 candidatas no exponenciales no fueron rechazadas, pero se detectó que 13 de las 93 reparaciones de `treadmill` (14,0%) tienen `repair_duration_min` exactamente igual a 50 min, muy por encima de lo observado en cualquiera de las otras 10 máquinas (entre 0,7% y 2,3% de observaciones en su propio máximo). El diccionario de datos no documenta ningún tope para esta variable. Este patrón es indicativo de censura o un límite operacional no informado en el enunciado. Se reporta lognorm (mejor p-value entre las 3 candidatas) como la mejor aproximación disponible, dejando explícito que ~14% de la muestra podría no representar la duración real de la reparación.
+
+## 6. Estado del archivo
+
+`srep.py` importa `ajustar_distribucion` desde `ajustes.py` y contiene: carga de `log_reparaciones_limpio.csv`, verificación inicial, decisión de agrupación (boxplot y Kruskal-Wallis en dos niveles más verificación de homogeneidad interna), y el ajuste final de las 5 categorías. Genera 6 boxplots, hasta 20 QQ-plots y 5 histogramas.
+
+# Parte VI — Caracterización de S^C_i (`sci.py`)
+
+*Análisis real de la variable de duración de sesión de cardio, usando `ajustar_distribucion` de `ajustes.py` sobre `cardio.csv`*
+
+## 1. Objetivo y alcance
+
+Este archivo contiene únicamente el análisis específico de S^C_i: decisión de agrupación, selección de candidatas, ajuste y test de bondad de ajuste. No contiene la función `ajustar_distribucion` en sí (vive en `ajustes.py` y se importa), ni el filtro que genera `cardio.csv` (resuelto en `filtros.py`, Parte III).
+
+## 2. Decisión de agrupación
+
+A diferencia de S^rep_f, aquí no hay múltiples máquinas que agrupar en categorías: `cardio.csv` registra una sola actividad (trotadora), y la única variable categórica disponible es `profile` (perfil del usuario: standard, express, flexible, intenso). Se comparó `duration_min` entre los 4 perfiles mediante boxplot y un test de Kruskal-Wallis, para decidir si la variable puede modelarse conjuntamente o requiere separarse en grupos.
+
+El test rechazó $H_0$ con margen amplio ($H=1241{,}84$; $p<0{,}001$), un estadístico bastante mayor al observado entre categorías de máquina en Srep ($H=246{,}03$), confirmando que la duración de la sesión de cardio difiere fuertemente entre perfiles.
+
+**Interpretación en el sistema.** El enunciado (Tabla 8) fija la permanencia máxima $T_k^{max}$ por perfil: Estándar 72 min, Express 50 min, Flexible 52 min, Intenso sin cota (tolerancia de espera infinita). El orden de las medias observadas replica exactamente ese orden: Express (8,92 min, la más baja y con la menor dispersión, $std=1{,}13$) < Flexible (16,05) < Estándar (17,69) < Intenso (26,81 min, la más alta y con la mayor dispersión, $std=9{,}34$). A menor presupuesto de tiempo total en el gimnasio, sesión de cardio más corta y menos variable, un resultado con sentido operacional y no solo estadístico.
+
+A diferencia de Srep, `profile` es la única variable categórica disponible en este archivo y ya es el nivel más fino de agrupación posible, por lo que no corresponde un segundo nivel de test (colapsar categorías). Sí se verificó si `routine` aportaba una diferencia adicional dentro de cada perfil, análogo a la verificación de homogeneidad interna hecha en Srep. Un Kruskal-Wallis por `routine` sobre el conjunto completo rechaza $H_0$ ($H=35{,}60$; $p<0{,}001$), pero al repetir el test dentro de cada perfil por separado, ninguno rechaza (Estándar $p=0{,}384$; Intenso $p=0{,}227$; Flexible $p=0{,}414$; Express $p=0{,}531$). El rechazo agregado es un efecto de confusión: los perfiles difieren entre sí en qué rutinas eligen con mayor frecuencia, y como también difieren en duración de cardio, eso genera una diferencia espuria por `routine` a nivel agregado que desaparece al controlar por perfil. Se confirma que `profile` es el único nivel de agrupación necesario para S^C_i.
+
+## 3. Selección de candidatas
+
+Mismo criterio de contexto usado en Srep: variable continua, positiva, sin cota superior natural, familias candidatas Exponencial, Gamma, Lognormal y Weibull, testeadas directamente con el test de bondad de ajuste en cada uno de los 4 perfiles, sin descartar la Exponencial de antemano por coeficiente de variación.
+
+## 4. Ajuste y resultados por perfil
+
+Se aplicó `ajustar_distribucion` una vez por cada uno de los 4 perfiles, con las 4 candidatas de contexto. La Exponencial fue rechazada en los 4 perfiles sin excepción.
+
+| Perfil | Distribución elegida | p-value | Estado |
+|---|---|---|---|
+| Intenso | weibull_min | 0,730 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Flexible | weibull_min | 0,794 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Express | weibull_min | 0,560 | Ajuste válido (mejor p-value entre 3 no rechazadas) |
+| Estándar | weibull_min | 0,1196 (KS) / ≈0 (simulado) | Mejor aproximación disponible; ninguna candidata pasa el test formal (ver limitación) |
+
+## 5. Limitaciones documentadas
+
+**Estándar: ninguna candidata ajusta formalmente.** Las 4 candidatas fueron rechazadas: la Exponencial de forma directa, Gamma y Lognormal por KS directo ($p=0{,}0367$ y $p=0{,}0461$ respectivamente), y Weibull cayó en zona ambigua ($p_{KS}=0{,}1196$) pero el bootstrap paramétrico confirmó el rechazo ($p$ simulado $\approx 0$). Se encontró que el 6,69% de las 1.210 observaciones de este perfil (81 filas) están exactamente en el valor máximo, 28,0 min, muy por encima de lo observado en los otros tres perfiles en su propio máximo (entre 0,13% y 0,33%, es decir, una sola observación cada uno, como se espera
+
+## 6. Estado del archivo
+
+`sci.py` importa `ajustar_distribucion` desde `ajustes.py` y contiene: carga de `cardio.csv`, verificación inicial, decisión de agrupación (boxplot y Kruskal-Wallis por `profile`), selección de candidatas, ajuste final de los 4 perfiles, la revisión de la acumulación en el máximo de Estándar, y la verificación de si `routine` aporta diferencia adicional dentro de cada perfil. Genera 1 boxplot comparativo, hasta 16 QQ-plots, 4 histogramas y 4 boxplots individuales (generados por `ajustar_distribucion`).
+
+
+
