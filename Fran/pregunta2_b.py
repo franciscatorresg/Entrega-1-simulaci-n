@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 
-# 1. Cargar datos y preparar conteos
 df_op = pd.read_csv('Bita/log_operacional_limpio.csv')
 df_llegadas = df_op[df_op['event_type'] == 'visit'].copy()
 
