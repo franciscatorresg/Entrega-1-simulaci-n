@@ -99,14 +99,13 @@ print(f"Error relativo medio: {error_rel.mean():.2f}%  (máximo: {error_rel.max(
 
 # 2) Total de llegadas por jornada
 tot_hist, tot_sim = C_hist.sum(axis=1), C_sim.sum(axis=1)
-ks_tot = stats.ks_2samp(tot_hist, tot_sim)
+mw_tot = stats.mannwhitneyu(tot_hist, tot_sim)
 print("\n" + "=" * 75)
 print("2) TOTAL DE LLEGADAS POR JORNADA")
 print("-" * 75)
 print(f"Histórico: media={tot_hist.mean():.2f}, var={tot_hist.var(ddof=1):.2f}")
 print(f"Simulado : media={tot_sim.mean():.2f}, var={tot_sim.var(ddof=1):.2f}")
-print(f"KS dos muestras: D={ks_tot.statistic:.4f}, p-value={ks_tot.pvalue:.4f}")
-
+print(f"Mann-Whitney: U={mw_tot.statistic:.1f}, p-value={mw_tot.pvalue:.4f}")
 # 3) Proporción de perfiles
 tabla_perf = pd.DataFrame({'hist': df_llegadas['perfil'].value_counts(),
                            'sim': df_simulacion['perfil'].value_counts()})
@@ -116,21 +115,6 @@ print("3) PROPORCIÓN DE PERFILES")
 print("-" * 75)
 print((tabla_perf / tabla_perf.sum()).round(4).to_string())
 print(f"Chi-cuadrado de homogeneidad: chi2={chi2_p:.4f}, gl={gl_p}, p-value={p_p:.4f}")
-
-# 4) Tiempos entre llegadas por bloque
-def entre_llegadas(df, col_t, col_dia, a, b):
-    sub = df[(df[col_t] >= a) & (df[col_t] < b)]
-    return np.concatenate([np.diff(np.sort(g[col_t].values)) for _, g in sub.groupby(col_dia)])
-print("\n" + "=" * 75)
-print("4) TIEMPOS ENTRE LLEGADAS POR BLOQUE")
-print("-" * 75)
-for nombre, (a, b) in bloques.items():
-    ia_h = entre_llegadas(df_llegadas, 'event_time', 'day_id', a, b)
-    ia_s = entre_llegadas(df_simulacion, 'tiempo_llegada', 'dia_sim', a, b)
-    ks_ia = stats.ks_2samp(ia_h, ia_s)
-    print(f"{nombre}: media hist={ia_h.mean():.3f} min, media sim={ia_s.mean():.3f} min, "
-          f"KS D={ks_ia.statistic:.4f}, p-value={ks_ia.pvalue:.4f}")
-print("=" * 75)
 
 # ------------------ GRÁFICOS ------------------
 x = intervalos + 30                              

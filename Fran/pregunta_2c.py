@@ -27,8 +27,7 @@ for nombre, (a, b) in bloques.items():
     N_b = ((df_llegadas['event_time'] >= a) & (df_llegadas['event_time'] < b)).sum()
     exposicion = dias_totales * horas                 # horas-jornada observadas en el bloque
     lam = N_b / exposicion                            # estimador de máxima verosimilitud
-    ic_inf = stats.chi2.ppf(0.025, 2 * N_b) / 2 / exposicion
-    ic_sup = stats.chi2.ppf(0.975, 2 * N_b + 2) / 2 / exposicion
+    
     tasas_bloque[nombre] = lam
     print(f"[{nombre}] : N = {N_b}, lambda = {lam:.4f} llegadas/hora "
           f"({lam/60:.4f} por min)   IC95%: [{ic_inf:.4f}, {ic_sup:.4f}]")
