@@ -12,7 +12,7 @@ Este repositorio contiene el código y los resultados que respaldan el informe d
 ```
 Entrega 1 simulación/
 ├── README.md
-├── ENUNCIADOS/
+├── Enunciados y Plan de Trabajo/
 │   ├── Proyecto - Enunciado.pdf          # Enunciado del proyecto
 │   └── Proyecto - Entrega 1.pdf          # Enunciado de la Entrega 1
 │
@@ -57,71 +57,57 @@ pip install pandas numpy scipy matplotlib
 
 ---
 
-## Orden de ejecución
+## Cómo ejecutar
 
-Los scripts deben ejecutarse en este orden, ya que cada etapa usa los archivos generados por la anterior.
-
-### 1. Limpieza de datos (carpeta `Bita/`)
-
-Estos scripts usan rutas relativas a su propia carpeta, por lo que se ejecutan **desde dentro de `Bita/`**:
+Abrir una terminal en la carpeta principal (`Entrega 1 simulación/`) y copiar estos comandos **en este orden**:
 
 ```bash
 cd Bita
-python limpieza_operacional.py      # log_operacional_historico.csv  -> log_operacional_limpio.csv
-python limpieza_reparaciones.py     # log_reparaciones_historico.csv -> log_reparaciones_limpio.csv
-python filtros.py                   # genera rutina.csv, fuerza.csv y cardio.csv
-cd ..
-```
 
-### 2. Parte 1 — Análisis y ajuste de distribuciones
+# Paso 1 — Limpieza de datos
+python limpieza_operacional.py
+python limpieza_reparaciones.py
+python filtros.py
 
-| Variable | Script | Ejecutar desde | Resultados |
-|---|---|---|---|
-| Tipo de rutina $R_i$ | `Pauli/analisis_rutina.py` | carpeta raíz | `Pauli/resultados_rutina.csv`, `Pauli/rutina_por_perfil.csv`, `Pauli/proporcion_rutina_por_perfil.csv`, figuras `distribucion_rutinas.png` y `rutina_por_perfil.png` |
-| Duración de fuerza $S^F_{ij}$ | `Pauli/analisis_fuerza.py` | carpeta raíz | `Pauli/resultados_ajuste_fuerza.csv`, `Pauli/seleccion_distribuciones_fuerza.csv`, `Pauli/modelo_fuerza_final.csv`, `Pauli/tabla_maestra_fuerza.csv`, figuras por máquina |
-| Duración de cardio $S^C_i$ | `Bita/sci.py` | `Bita/` | Figuras por perfil (histogramas, boxplots, QQ-plots) y resultados en consola |
-| Tiempo de reparación $S^{rep}_f$ | `Bita/srep.py` | `Bita/` | Figuras por categoría funcional y resultados en consola |
-
-```bash
-python Pauli/analisis_rutina.py
-python Pauli/analisis_fuerza.py
-cd Bita
+# Paso 2 — Parte 1: cardio y reparaciones
 python sci.py
 python srep.py
 cd ..
-```
 
-`Bita/ajustes.py` no se ejecuta directamente: es el módulo con la función `ajustar_distribucion`, que ajusta las distribuciones candidatas por máxima verosimilitud, genera histogramas y QQ-plots y aplica el test de Kolmogorov-Smirnov (con bootstrap paramétrico cuando el p-value cae en la zona ambigua). Lo usan `sci.py`, `srep.py` y `analisis_fuerza.py`.
+# Paso 3 — Parte 1: rutina y fuerza (se corre desde la carpeta principal)
+python Pauli/analisis_rutina.py
+python Pauli/analisis_fuerza.py
 
-Todas las figuras de la Parte 1 se guardan en `Figuras ajustes/`.
-
-### 3. Parte 2 — Análisis del proceso de llegada
-
-Se ejecutan **desde la carpeta raíz** (leen `Bita/log_operacional_limpio.csv`):
-
-| Sección | Script | Contenido |
-|---|---|---|
-| 2a | `Fran/pregunta_2a.py` | Llegadas promedio por hora, global y por perfil |
-| 2b | `Fran/pregunta_2b.py` | Tests: (1) Chi-cuadrado de llegadas diarias Poisson, (2) Kruskal-Wallis entre jornadas, (3) KS de homogeneidad del proceso, (4) Chi-cuadrado de tasa constante por bloque, (5) KS de uniformidad por bloque, (6) Chi-cuadrado de independencia perfil–hora |
-| 2c | `Fran/pregunta_2c.py` | Probabilidades de perfil y tasas $\lambda_b$ del proceso de Poisson no homogéneo por bloque horario, con intervalos de confianza |
-
-```bash
+# Paso 4 — Partes 2 y 3: proceso de llegada (se corre desde la carpeta principal)
 python Fran/pregunta_2a.py
 python Fran/pregunta_2b.py
 python Fran/pregunta_2c.py
-```
-
-### 4. Parte 3 — Simulación del proceso de llegada
-
-| Sección | Script | Contenido |
-|---|---|---|
-| 3a y 3b | `Fran/pregunta_3.py` | Generación de llegadas con el algoritmo de Thinning, simulación de 200 jornadas y comparación con los datos históricos (por hora, por perfil y total diario) |
-
-```bash
 python Fran/pregunta_3.py
 ```
 
-El código que genera las llegadas es la función `simular_dia_llegadas` de `Fran/pregunta_3.py`. La simulación usa una semilla fija (`np.random.seed(42)`), por lo que los resultados del informe son reproducibles.
+> **Importante:** los scripts de `Bita/` se ejecutan **dentro** de `Bita/`; los de `Pauli/` y `Fran/` se ejecutan desde la **carpeta principal**.
+>
+> El Paso 1 solo es necesario para regenerar los datos limpios. Los archivos resultantes ya están incluidos en `Bita/`, por lo que esos tres comandos se pueden omitir (manteniendo el `cd Bita`).
+
+---
+
+## ¿Dónde está cada pregunta del informe?
+
+| Pregunta | Script | Qué hace |
+|---|---|---|
+| 1 — Tipo de rutina $R_i$ | `Pauli/analisis_rutina.py` | Frecuencias, test $\chi^2$ perfil–rutina y probabilidades por perfil |
+| 1 — Fuerza $S^F_{ij}$ | `Pauli/analisis_fuerza.py` | Análisis por máquina, ajuste y selección de distribuciones |
+| 1 — Cardio $S^C_i$ | `Bita/sci.py` | Análisis por perfil, ajuste y selección de distribuciones |
+| 1 — Reparaciones $S^{rep}_f$ | `Bita/srep.py` | Análisis por categoría, ajuste y selección de distribuciones |
+| 2a | `Fran/pregunta_2a.py` | Gráficos de llegadas promedio por hora (global y por perfil) |
+| 2b | `Fran/pregunta_2b.py` | Tests de hipótesis del proceso de llegada |
+| 2c | `Fran/pregunta_2c.py` | Estimación de tasas por bloque y probabilidades de perfil |
+| 3a y 3b | `Fran/pregunta_3.py` | Simulación de llegadas (Thinning) y comparación con los datos históricos |
+
+**Notas:**
+- `Bita/ajustes.py` no se ejecuta: contiene la función `ajustar_distribucion`, que usan los scripts de la Parte 1.
+- Las figuras de la Parte 1 se guardan en `Figuras ajustes/`; las tablas de resultados de fuerza y rutina, en `Pauli/`.
+- El código que genera las llegadas es la función `simular_dia_llegadas` de `Fran/pregunta_3.py`. Usa la semilla `42`, por lo que los resultados son reproducibles.
 
 ---
 
