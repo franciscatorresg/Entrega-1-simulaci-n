@@ -1,27 +1,43 @@
 import pandas as pd
 import numpy as np
+import scipy.stats as stats
 
 df_op = pd.read_csv('Bita/log_operacional_limpio.csv')
 df_llegadas = df_op[df_op['event_type'] == 'visit'].copy()
 
 print("=== PARÁMETROS DE PERFIL DE USUARIO ===")
-print("Distribución Categórica (Proporciones):")
+n_total = len(df_llegadas)
 proporciones = df_llegadas['profile'].value_counts(normalize=True)
 for perfil, prob in proporciones.items():
-    print(f"P({perfil}) = {prob:.4f}")
+    ic = 1.96 * np.sqrt(prob * (1 - prob) / n_total)
+    print(f"P({perfil}) = {prob:.4f}   IC95%: [{prob - ic:.4f}, {prob + ic:.4f}]")
 
-print("\n=== TASAS DEL PROCESO DE POISSON NO ESTACIONARIO (Lambda) ===")
-print("Tasa promedio de llegadas por intervalo de 60 minutos:")
-tamano_intervalo = 60
-df_llegadas['intervalo'] = (df_llegadas['event_time'] // tamano_intervalo) * tamano_intervalo
-
+print("\n=== TASAS DEL PROCESO DE POISSON NO ESTACIONARIO (Lambda por bloque) ===")
 dias_totales = df_llegadas['day_id'].nunique()
-llegadas_por_intervalo = df_llegadas.groupby('intervalo').size()
-tasa_lambda = llegadas_por_intervalo / dias_totales
+bloques = {
+    '07:00-10:00': (0, 180),
+    '10:00-13:00': (180, 360),
+    '13:00-16:00': (360, 540),
+    '16:00-19:00': (540, 720),
+    '19:00-21:00': (720, 840),
+}
+tasas_bloque = {}
+for nombre, (a, b) in bloques.items():
+    horas = (b - a) / 60
+    N_b = ((df_llegadas['event_time'] >= a) & (df_llegadas['event_time'] < b)).sum()
+    exposicion = dias_totales * horas                 # horas-jornada observadas en el bloque
+    lam = N_b / exposicion                            # estimador de máxima verosimilitud
+    ic_inf = stats.chi2.ppf(0.025, 2 * N_b) / 2 / exposicion
+    ic_sup = stats.chi2.ppf(0.975, 2 * N_b + 2) / 2 / exposicion
+    tasas_bloque[nombre] = lam
+    print(f"[{nombre}] : N = {N_b}, lambda = {lam:.4f} llegadas/hora "
+          f"({lam/60:.4f} por min)   IC95%: [{ic_inf:.4f}, {ic_sup:.4f}]")
 
-intervalos_posibles = np.arange(0, 840, tamano_intervalo)
-tasa_lambda = tasa_lambda.reindex(intervalos_posibles, fill_value=0)
+print("\n=== TASAS POR PERFIL: lambda_k(t) = P(k) * lambda(t) ===")
+for nombre, lam in tasas_bloque.items():
+    texto = ", ".join(f"{p}={prob*lam:.3f}" for p, prob in proporciones.items())
+    print(f"[{nombre}] : {texto}")
 
-for intervalo, tasa in tasa_lambda.items():
-    hora = int(7 + intervalo // 60)
-    print(f"[{hora:02d}:00 - {hora+1:02d}:00] : lambda = {tasa:.4f} llegadas/hora")
+esperadas = sum(tasas_bloque[n] * (b - a) / 60 for n, (a, b) in bloques.items())
+print(f"\nLlegadas esperadas por jornada: {esperadas:.2f} "
+      f"(promedio histórico: {n_total / dias_totales:.2f})")
