@@ -77,3 +77,87 @@ if pval_fisher < 0.05:
 else:
     print("Conclusión: No se rechaza H0. El proceso es compatible con las propiedades de Poisson.")
 print("="*60)
+
+
+# ============================================================
+# BLOQUES HORARIOS (minutos desde las 07:00) observados en 2a
+# ============================================================
+bloques = {
+    '07:00-10:00': (0, 180),
+    '10:00-13:00': (180, 360),
+    '13:00-16:00': (360, 540),
+    '16:00-19:00': (540, 720),
+    '19:00-21:00': (720, 840),
+}
+# Total de llegadas por intervalo (sumando las 40 jornadas)
+total_por_intervalo = conteos_global.groupby('intervalo')['llegadas'].sum()
+
+print("\n" + "="*60)
+print("TEST 4: TASA CONSTANTE DENTRO DE CADA BLOQUE (Chi-cuadrado de homogeneidad)")
+print("H0: Todas las horas del bloque tienen la misma tasa.")
+print("H1: Al menos una hora del bloque tiene una tasa distinta.")
+print("-" * 60)
+for nombre, (a, b) in bloques.items():
+    conteos_bloque = total_por_intervalo.loc[a:b - 1]
+    chi2_b, p_b = stats.chisquare(conteos_bloque)
+    print(f"{nombre}: conteos={conteos_bloque.tolist()}, chi2={chi2_b:.4f}, gl={len(conteos_bloque)-1}, p-value={p_b:.4f}")
+
+
+print("\n" + "="*60)
+print("TEST 5: UNIFORMIDAD CONDICIONAL DENTRO DE CADA BLOQUE (Kolmogorov-Smirnov)")
+print("H0: Dentro del bloque, los instantes de llegada son Uniformes(a, b).")
+print("H1: Los instantes de llegada no son uniformes dentro del bloque.")
+print("-" * 60)
+for nombre, (a, b) in bloques.items():
+    tiempos = df_llegadas.loc[(df_llegadas['event_time'] >= a) & (df_llegadas['event_time'] < b), 'event_time']
+    ks_u = stats.kstest((tiempos - a) / (b - a), 'uniform')
+    print(f"{nombre}: n={len(tiempos)}, D={ks_u.statistic:.4f}, p-value={ks_u.pvalue:.4f}")
+
+
+print("\n" + "="*60)
+print("TEST 6: TIEMPOS ENTRE LLEGADAS EXPONENCIALES POR BLOQUE (Kolmogorov-Smirnov)")
+print("H0: Los tiempos entre llegadas del bloque siguen una Exponencial.")
+print("H1: Los tiempos entre llegadas no siguen una Exponencial.")
+print("-" * 60)
+for nombre, (a, b) in bloques.items():
+    sub = df_llegadas[(df_llegadas['event_time'] >= a) & (df_llegadas['event_time'] < b)]
+    entre_llegadas = []
+    for dia, grupo in sub.groupby('day_id'):          # solo diferencias dentro de un mismo día
+        entre_llegadas.extend(np.diff(np.sort(grupo['event_time'].values)))
+    entre_llegadas = np.array(entre_llegadas)
+    media_ia = entre_llegadas.mean()
+    ks_e = stats.kstest(entre_llegadas, 'expon', args=(0, media_ia))
+    print(f"{nombre}: n={len(entre_llegadas)}, media={media_ia:.3f} min, "
+          f"CV={entre_llegadas.std()/media_ia:.3f}, D={ks_e.statistic:.4f}, p-value={ks_e.pvalue:.4f}")
+    
+
+print("\n" + "="*60)
+print("TEST 7: INCREMENTOS INDEPENDIENTES (Correlación entre horas consecutivas / Fisher)")
+print("H0: Los conteos de horas consecutivas no están correlacionados.")
+print("H1: Existe correlación entre conteos de horas consecutivas.")
+print("-" * 60)
+matriz = conteos_global.pivot(index='day_id', columns='intervalo', values='llegadas')
+p_values_corr, correlaciones = [], []
+for t in intervalos_posibles[:-1]:
+    r, p_r = stats.pearsonr(matriz[t], matriz[t + tamano_intervalo])
+    correlaciones.append(r)
+    p_values_corr.append(p_r)
+stat_corr, pval_corr = stats.combine_pvalues(p_values_corr)
+print(f"Correlación promedio: {np.mean(correlaciones):.4f}")
+print(f"Estadístico de prueba (Fisher combinado): {stat_corr:.4f}")
+print(f"P-value global: {pval_corr:.4f}")
+
+
+print("\n" + "="*60)
+print("TEST 8: ESTABILIDAD ENTRE JORNADAS")
+print("-" * 60)
+totales_diarios = matriz.sort_index().sum(axis=1).values
+n_dias = len(totales_diarios)
+disp_dias = (n_dias - 1) * np.var(totales_diarios, ddof=1) / np.mean(totales_diarios)
+p_disp_dias = stats.chi2.sf(disp_dias, df=n_dias - 1)
+print("8a) H0: Todas las jornadas tienen la misma intensidad (totales diarios Poisson).")
+print(f"    Estadístico: {disp_dias:.4f} (gl={n_dias-1}), p-value: {p_disp_dias:.4f}")
+rho, p_tend = stats.spearmanr(np.arange(n_dias), totales_diarios)
+print("8b) H0: No existe tendencia en el total diario de llegadas (Spearman).")
+print(f"    Estadístico: rho={rho:.4f}, p-value: {p_tend:.4f}")
+print("="*60)

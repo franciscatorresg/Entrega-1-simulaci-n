@@ -48,7 +48,8 @@ plt.show()
 plt.figure(figsize=(10, 5))
 for p in df_llegadas['profile'].dropna().unique():
     data_p = conteos_perfil[conteos_perfil['profile'] == p]
-    promedio_p = data_p.groupby('intervalo')['llegadas'].mean().reindex(intervalos_posibles, fill_value=0)
+    data_p = data_p.set_index(['day_id', 'intervalo'])['llegadas'].reindex(grilla, fill_value=0).reset_index()
+    promedio_p = data_p.groupby('intervalo')['llegadas'].mean()
     plt.plot(promedio_p.index, promedio_p.values, marker='o', label=f'Perfil: {p}')
 
 plt.title('Promedio de llegadas por intervalo según Perfil')
