@@ -12,11 +12,12 @@ Este repositorio contiene el código y los resultados que respaldan el informe d
 ```
 Entrega 1 simulación/
 ├── README.md
-├── Proyecto - Enunciado.pdf              # Enunciado del proyecto
-├── Proyecto - Entrega 1.pdf              # Enunciado de la Entrega 1
-├── diccionario_logs.xlsx                 # Diccionario de variables de los logs
+├── ENUNCIADOS/
+│   ├── Proyecto - Enunciado.pdf          # Enunciado del proyecto
+│   └── Proyecto - Entrega 1.pdf          # Enunciado de la Entrega 1
 │
 ├── Bita/                                 # Limpieza de datos + Parte 1 (S^C_i y S^rep_f)
+│   ├── diccionario_logs.xlsx             # Diccionario de variables de los logs
 │   ├── log_operacional_historico.csv     # Datos originales
 │   ├── log_reparaciones_historico.csv    # Datos originales
 │   ├── limpieza_operacional.py           # -> log_operacional_limpio.csv
@@ -48,10 +49,10 @@ Entrega 1 simulación/
 ## Requisitos
 
 - Python 3.10 o superior
-- Librerías: `pandas`, `numpy`, `scipy`, `matplotlib`, `openpyxl` (para leer el diccionario)
+- Librerías: `pandas`, `numpy`, `scipy`, `matplotlib`
 
 ```bash
-pip install pandas numpy scipy matplotlib openpyxl
+pip install pandas numpy scipy matplotlib
 ```
 
 ---
@@ -100,7 +101,7 @@ Se ejecutan **desde la carpeta raíz** (leen `Bita/log_operacional_limpio.csv`):
 
 | Sección | Script | Contenido |
 |---|---|---|
-| 2a | `Fran/pregunta_2a.py` | Llegadas promedio por hora, global y por perfil (Figuras 15 y 16 del informe) |
+| 2a | `Fran/pregunta_2a.py` | Llegadas promedio por hora, global y por perfil |
 | 2b | `Fran/pregunta_2b.py` | Tests: (1) Chi-cuadrado de llegadas diarias Poisson, (2) Kruskal-Wallis entre jornadas, (3) KS de homogeneidad del proceso, (4) Chi-cuadrado de tasa constante por bloque, (5) KS de uniformidad por bloque, (6) Chi-cuadrado de independencia perfil–hora |
 | 2c | `Fran/pregunta_2c.py` | Probabilidades de perfil y tasas $\lambda_b$ del proceso de Poisson no homogéneo por bloque horario, con intervalos de confianza |
 
