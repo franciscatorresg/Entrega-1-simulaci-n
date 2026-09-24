@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import scipy.stats as stats
 
 # Fijar semilla para reproducibilidad
 np.random.seed(42)
@@ -14,10 +15,21 @@ proporciones = df_llegadas['profile'].value_counts(normalize=True)
 perfiles = proporciones.index.values
 prob_perfiles = proporciones.values
 
-# Tasas lambda por bloque de 60 minutos
-df_llegadas['intervalo'] = (df_llegadas['event_time'] // 60) * 60
+# Tasas lambda por BLOQUE (estimadas en 2c), expresadas por hora
+bloques = {
+    '07:00-10:00': (0, 180),
+    '10:00-13:00': (180, 360),
+    '13:00-16:00': (360, 540),
+    '16:00-19:00': (540, 720),
+    '19:00-21:00': (720, 840),
+}
 dias_totales = df_llegadas['day_id'].nunique()
-tasa_lambda = (df_llegadas.groupby('intervalo').size() / dias_totales).reindex(np.arange(0, 840, 60), fill_value=0).values
+intervalos = np.arange(0, 840, 60)
+tasa_lambda = np.zeros(len(intervalos))
+for nombre, (a, b) in bloques.items():
+    N_b = ((df_llegadas['event_time'] >= a) & (df_llegadas['event_time'] < b)).sum()
+    lam_b = N_b / (dias_totales * (b - a) / 60)          # llegadas/hora del bloque
+    tasa_lambda[(intervalos >= a) & (intervalos < b)] = lam_b   # misma tasa para cada hora del bloque
 
 # ALGORITMO DE THINNING (Parte 3a)
 def simular_dia_llegadas(lambda_rates, perfiles, prob_perfiles):
@@ -57,18 +69,108 @@ for dia in range(N_simulaciones):
 
 df_simulacion = pd.concat(todas_llegadas_sim)
 
-# GRAFICAR RESULTADOS
-df_simulacion['intervalo'] = (df_simulacion['tiempo_llegada'] // 60) * 60
-sim_por_hora = df_simulacion.groupby('intervalo').size() / N_simulaciones
-sim_por_hora = sim_por_hora.reindex(np.arange(0, 840, 60), fill_value=0)
 
+# ============================================================
+# VALIDACIÓN (Parte 3b): histórico vs simulado
+def matriz_conteos(df, col_dia, n_dias_idx, perfil=None):
+    if perfil is not None:
+        df = df[df['perfil'] == perfil]
+    return (df.groupby([col_dia, 'intervalo']).size().unstack(fill_value=0)
+              .reindex(index=n_dias_idx, columns=intervalos, fill_value=0))
+
+df_llegadas['perfil'] = df_llegadas['profile']
+df_llegadas['intervalo'] = (df_llegadas['event_time'] // 60) * 60
+df_simulacion['intervalo'] = (df_simulacion['tiempo_llegada'] // 60) * 60
+dias_hist = sorted(df_llegadas['day_id'].unique())
+C_hist = matriz_conteos(df_llegadas, 'day_id', dias_hist)
+C_sim = matriz_conteos(df_simulacion, 'dia_sim', range(N_simulaciones))
+
+# 1) Media y varianza por hora + test de Mann-Whitney (hist vs sim)
+print("=" * 75)
+print("1) LLEGADAS POR HORA: HISTÓRICO VS SIMULADO")
+print("-" * 75)
+print(f"{'Hora':<7}{'Media hist':>11}{'Media sim':>11}{'Var hist':>10}{'Var sim':>10}{'p MW':>8}")
+for t in intervalos:
+    p_mw = stats.mannwhitneyu(C_hist[t], C_sim[t]).pvalue
+    print(f"{7 + t//60:02d}:00  {C_hist[t].mean():>10.2f}{C_sim[t].mean():>11.2f}"
+          f"{C_hist[t].var(ddof=1):>10.2f}{C_sim[t].var(ddof=1):>10.2f}{p_mw:>8.3f}")
+error_rel = (np.abs(C_sim.mean() - C_hist.mean()) / C_hist.mean()) * 100
+print(f"Error relativo medio: {error_rel.mean():.2f}%  (máximo: {error_rel.max():.2f}%)")
+
+# 2) Total de llegadas por jornada
+tot_hist, tot_sim = C_hist.sum(axis=1), C_sim.sum(axis=1)
+ks_tot = stats.ks_2samp(tot_hist, tot_sim)
+print("\n" + "=" * 75)
+print("2) TOTAL DE LLEGADAS POR JORNADA")
+print("-" * 75)
+print(f"Histórico: media={tot_hist.mean():.2f}, var={tot_hist.var(ddof=1):.2f}")
+print(f"Simulado : media={tot_sim.mean():.2f}, var={tot_sim.var(ddof=1):.2f}")
+print(f"KS dos muestras: D={ks_tot.statistic:.4f}, p-value={ks_tot.pvalue:.4f}")
+
+# 3) Proporción de perfiles
+tabla_perf = pd.DataFrame({'hist': df_llegadas['perfil'].value_counts(),
+                           'sim': df_simulacion['perfil'].value_counts()})
+chi2_p, p_p, gl_p, _ = stats.chi2_contingency(tabla_perf.values)
+print("\n" + "=" * 75)
+print("3) PROPORCIÓN DE PERFILES")
+print("-" * 75)
+print((tabla_perf / tabla_perf.sum()).round(4).to_string())
+print(f"Chi-cuadrado de homogeneidad: chi2={chi2_p:.4f}, gl={gl_p}, p-value={p_p:.4f}")
+
+# 4) Tiempos entre llegadas por bloque
+def entre_llegadas(df, col_t, col_dia, a, b):
+    sub = df[(df[col_t] >= a) & (df[col_t] < b)]
+    return np.concatenate([np.diff(np.sort(g[col_t].values)) for _, g in sub.groupby(col_dia)])
+print("\n" + "=" * 75)
+print("4) TIEMPOS ENTRE LLEGADAS POR BLOQUE")
+print("-" * 75)
+for nombre, (a, b) in bloques.items():
+    ia_h = entre_llegadas(df_llegadas, 'event_time', 'day_id', a, b)
+    ia_s = entre_llegadas(df_simulacion, 'tiempo_llegada', 'dia_sim', a, b)
+    ks_ia = stats.ks_2samp(ia_h, ia_s)
+    print(f"{nombre}: media hist={ia_h.mean():.3f} min, media sim={ia_s.mean():.3f} min, "
+          f"KS D={ks_ia.statistic:.4f}, p-value={ks_ia.pvalue:.4f}")
+print("=" * 75)
+
+# ------------------ GRÁFICOS ------------------
+x = intervalos + 30                              
+marcas_x = np.arange(0, 841, 120)
+etiquetas_x = [f"{7 + t//60:02d}:00" for t in marcas_x]
+
+# Figura A: global 
 plt.figure(figsize=(10, 5))
-plt.plot(np.arange(0, 840, 60), tasa_lambda, label='Histórico (Teórico)', marker='o', linewidth=2)
-plt.plot(np.arange(0, 840, 60), sim_por_hora.values, label='Simulado (Promedio 200 días)', marker='x', linestyle='--', linewidth=2)
-plt.title('Validación del Generador de Llegadas: Histórico vs Simulado')
-plt.xlabel('Minuto de operación (0 = 07:00)')
-plt.ylabel('Llegadas promedio por hora')
-plt.legend()
-plt.grid(True, alpha=0.3)
+plt.step(np.r_[intervalos, 840], np.r_[tasa_lambda, tasa_lambda[-1]], where='post',
+         color='grey', label='λ(t) estimada')
+plt.errorbar(x - 5, C_hist.mean(), 1.96 * C_hist.std(ddof=1) / np.sqrt(len(dias_hist)),
+             fmt='o', capsize=3, label='Histórico (40 jornadas), IC 95%')
+plt.errorbar(x + 5, C_sim.mean(), 1.96 * C_sim.std(ddof=1) / np.sqrt(N_simulaciones),
+             fmt='x', capsize=3, label='Simulado (200 jornadas), IC 95%')
+plt.title('Validación del generador: llegadas por hora')
+plt.xlabel('Hora del día'); plt.ylabel('Llegadas promedio por hora')
+plt.xticks(marcas_x, etiquetas_x); plt.legend(); plt.grid(True, alpha=0.3); plt.tight_layout()
+
+# Figura B: por perfil
+plt.figure(figsize=(10, 5))
+for i, p in enumerate(tabla_perf.index):
+    plt.plot(x, matriz_conteos(df_llegadas, 'day_id', dias_hist, p).mean(), 'o-', color=f'C{i}',
+             label=f'{p} histórico')
+    plt.plot(x, matriz_conteos(df_simulacion, 'dia_sim', range(N_simulaciones), p).mean(), 'x--',
+             color=f'C{i}', label=f'{p} simulado')
+plt.title('Validación del generador: llegadas por hora según perfil')
+plt.xlabel('Hora del día'); plt.ylabel('Llegadas promedio por hora')
+plt.xticks(marcas_x, etiquetas_x); plt.legend(ncol=2, fontsize=8); plt.grid(True, alpha=0.3)
+plt.tight_layout()
+
+# Figura C: total por jornada e índice de dispersión
+fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
+bins = np.arange(300, 461, 10)
+ax[0].hist(tot_hist, bins=bins, density=True, alpha=0.5, label='Histórico')
+ax[0].hist(tot_sim, bins=bins, density=True, alpha=0.5, label='Simulado')
+ax[0].set(title='Llegadas totales por jornada', xlabel='Llegadas', ylabel='Densidad'); ax[0].legend()
+ax[1].bar(x - 8, C_hist.var(ddof=1) / C_hist.mean(), width=16, label='Histórico')
+ax[1].bar(x + 8, C_sim.var(ddof=1) / C_sim.mean(), width=16, label='Simulado')
+ax[1].axhline(1, color='black', linestyle='--', linewidth=1)
+ax[1].set(title='Índice de dispersión (varianza/media) por hora', xlabel='Hora del día')
+ax[1].set_xticks(marcas_x, etiquetas_x); ax[1].legend()
 plt.tight_layout()
 plt.show()
