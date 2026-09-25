@@ -1,19 +1,18 @@
 import pandas as pd
 import numpy as np
-import scipy.stats as stats
 
 df_op = pd.read_csv('Bita/log_operacional_limpio.csv')
 df_llegadas = df_op[df_op['event_type'] == 'visit'].copy()
 
 print("=== PARÁMETROS DE PERFIL DE USUARIO ===")
+print("Distribución Categórica (Proporciones):")
 n_total = len(df_llegadas)
 proporciones = df_llegadas['profile'].value_counts(normalize=True)
 for perfil, prob in proporciones.items():
-    ic = 1.96 * np.sqrt(prob * (1 - prob) / n_total)
-    print(f"P({perfil}) = {prob:.4f}   IC95%: [{prob - ic:.4f}, {prob + ic:.4f}]")
+    print(f"P({perfil}) = {prob:.4f}")
 
-print("\n=== TASAS DEL PROCESO DE POISSON NO ESTACIONARIO (Lambda por bloque) ===")
-dias_totales = df_llegadas['day_id'].nunique()
+print("\n=== TASAS DEL PROCESO DE POISSON NO HOMOGÉNEO (Lambda por bloque) ===")
+r = df_llegadas['day_id'].nunique()       
 bloques = {
     '07:00-10:00': (0, 180),
     '10:00-13:00': (180, 360),
@@ -22,15 +21,14 @@ bloques = {
     '19:00-21:00': (720, 840),
 }
 tasas_bloque = {}
+
+
 for nombre, (a, b) in bloques.items():
-    horas = (b - a) / 60
+    horas = (b - a) / 60                   # largo del bloque en horas
     N_b = ((df_llegadas['event_time'] >= a) & (df_llegadas['event_time'] < b)).sum()
-    exposicion = dias_totales * horas                 # horas-jornada observadas en el bloque
-    lam = N_b / exposicion                            # estimador de máxima verosimilitud
-    
+    lam = N_b / (r * horas)                # lambda = (1/T_b) * (suma de n_i / r)
     tasas_bloque[nombre] = lam
-    print(f"[{nombre}] : N = {N_b}, lambda = {lam:.4f} llegadas/hora "
-          f"({lam/60:.4f} por min)   IC95%: [{ic_inf:.4f}, {ic_sup:.4f}]")
+    print(f"[{nombre}] : N = {N_b}, lambda = {lam:.4f} llegadas/hora ({lam/60:.4f} por min)")
 
 print("\n=== TASAS POR PERFIL: lambda_k(t) = P(k) * lambda(t) ===")
 for nombre, lam in tasas_bloque.items():
@@ -39,4 +37,4 @@ for nombre, lam in tasas_bloque.items():
 
 esperadas = sum(tasas_bloque[n] * (b - a) / 60 for n, (a, b) in bloques.items())
 print(f"\nLlegadas esperadas por jornada: {esperadas:.2f} "
-      f"(promedio histórico: {n_total / dias_totales:.2f})")
+      f"(promedio histórico: {n_total / r:.2f})")
